@@ -14,7 +14,7 @@ import { Events } from './events.ts';
 import { External, helloSchema, MAX_WAIT_SECONDS, postSchema, replySchema } from './external.ts';
 import { UrlAgents } from './url-agent.ts';
 import { dispatch, parse, Router, sendJson } from './http.ts';
-import { codeTaskSchema, messageToolSchema, readThreadSchema, routineToolSchema, ToolTokens, Tools } from './mcp/tools.ts';
+import { codeTaskSchema, delegateSchema, messageToolSchema, readThreadSchema, routineToolSchema, ToolTokens, Tools, waitSchema } from './mcp/tools.ts';
 import { defaultWorkDir, hubPaths, projectsDir } from './paths.ts';
 import { HttpError } from './projects.ts';
 import { Routines } from './routines.ts';
@@ -32,6 +32,8 @@ export interface HubOptions {
   userHome?: string;
   // null: serve only the API (development, where Vite serves the web app).
   webDist?: string | null;
+  // How long agentry_delegate waits for a helper before answering 'running'; tests pass a short one. Default: DELEGATE_WAIT_MS.
+  delegateWaitMs?: number;
   onShutdown?: () => void;
 }
 
@@ -60,7 +62,7 @@ export async function createHub(options: HubOptions) {
   const runs = new Runs(store, events, home, [defaultWorkDir(home), paths.dir]);
   const tokens = new ToolTokens();
   const routines = new Routines(store, events, runs);
-  const tools = new Tools(store, events, runs, routines);
+  const tools = new Tools(store, events, runs, routines, options.delegateWaitMs);
   const external = new External(store, events, runs, hubUrl);
   const acp = new AcpHost({
     store, events, runs, catalog, tools: tokens, workDir: defaultWorkDir(options.userHome), bridgePath: join(serverDir, 'mcp', 'bridge.ts'), hubUrl,
@@ -93,7 +95,10 @@ export async function createHub(options: HubOptions) {
     .on('POST', '/tool-api/code-task', c => tools.startCodeTask(c.caller, parse(codeTaskSchema, c.body)))
     .on('POST', '/tool-api/code-thread', c => tools.readCodeThread(parse(readThreadSchema, c.body)))
     .on('POST', '/tool-api/routines', c => tools.createRoutine(c.caller, parse(routineToolSchema, c.body)))
-    .on('POST', '/tool-api/messages', c => tools.sendMessage(c.caller, parse(messageToolSchema, c.body)));
+    .on('POST', '/tool-api/messages', c => tools.sendMessage(c.caller, parse(messageToolSchema, c.body)))
+    .on('GET', '/tool-api/helpers', c => tools.listHelpers(c.caller))
+    .on('POST', '/tool-api/delegate', c => tools.delegate(c.caller, parse(delegateSchema, c.body)))
+    .on('POST', '/tool-api/wait-for-helper', c => tools.waitForHelper(c.caller, parse(waitSchema, c.body)));
 
   const agentApi = new Router<string>()
     .on('POST', '/agent-api/hello', c => external.hello(c.caller, parse(helloSchema, c.body)))

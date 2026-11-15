@@ -5,6 +5,7 @@ import type { Agent, AgentOptions, AgentStatus, Conversation, ConversationKind, 
 import type { CatalogEntry } from '../agents/catalog.ts';
 import type { Events } from '../events.ts';
 import type { ToolTokens } from '../mcp/tools.ts';
+import { describeHelpers } from '../helpers.ts';
 import { HttpError } from '../projects.ts';
 import { membershipKey, membershipUpdate, sessionContext } from './context.ts';
 import { formatPrompt, type Executor, type LiveRun, type RunOutcome, type Runs } from '../routing.ts';
@@ -164,7 +165,7 @@ export class AcpHost implements Executor {
 
   private context(agent: Agent, conversation: Conversation): string {
     const project = conversation.kind === 'code' && conversation.projectId ? this.o.store.getProject(conversation.projectId) : null;
-    return sessionContext(conversation, agent, this.o.runs.members(conversation), project);
+    return sessionContext(conversation, agent, this.o.runs.members(conversation), project, describeHelpers(this.o.store, conversation));
   }
 
   // What goes before the conversation text: the Agentry context once per new session, or a group change since the last prompt.
@@ -177,7 +178,7 @@ export class AcpHost implements Executor {
       // Built again so it states the group as it is now.
       return [this.context(live.agent, live.conversation)];
     }
-    return changed ? [membershipUpdate(live.conversation, live.agent, this.o.runs.members(live.conversation))] : [];
+    return changed ? [membershipUpdate(live.conversation, live.agent, this.o.runs.members(live.conversation), describeHelpers(this.o.store, live.conversation))] : [];
   }
 
   ensureSession(agent: Agent, conversation: Conversation): Promise<Session> {

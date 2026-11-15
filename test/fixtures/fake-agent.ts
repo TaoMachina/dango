@@ -9,6 +9,7 @@
 //   "subagent"   -> starts a subagent session "<sessionId>-child" and streams its model, a tool call and text
 //   "history"    -> also replies with the earlier prompt lines of this session, joined by " | "
 //   "env"        -> also replies with FAKE_SUBAGENT_MODEL from the agent's environment
+//   "later"      -> finishes after LATER_MS, longer than the wait budget test/delegate.test.ts gives the hub
 // session/fork copies a session's settings and history; session/resume reopens a session this process knows.
 // Each finished turn reports usage_update with 100 more tokens used of 1000.
 // Every reply starts with "<name> heard: <last line of the prompt>", so group notes are not echoed.
@@ -21,6 +22,8 @@ const values = new Map<string, Record<string, string | boolean>>();
 const turns = new Map<string, number>();
 const history = new Map<string, string[]>();
 let sessions = 0;
+// test/delegate.test.ts waits 300 ms for a helper; 1 s is safely longer.
+const LATER_MS = 1000;
 
 const select = (id: string, category: string, currentValue: string, choices: string[]) =>
   ({ id, name: id, category, type: 'select' as const, currentValue, options: choices.map(value => ({ value, name: value })) });
@@ -103,6 +106,10 @@ const app = acp.agent({ name })
       await say(` chose ${response.outcome.outcome === 'selected' ? response.outcome.optionId : 'cancelled'}`);
     }
     if (text.includes('chain') && target) await say(` @${target} chain`);
+    if (text.includes('later')) {
+      await new Promise(resolve => setTimeout(resolve, LATER_MS));
+      await say(' done later');
+    }
     if (text.includes('settings')) await say(` model=${values.get(sessionId)!.model} fast=${values.get(sessionId)!.fast}`);
     if (text.includes('slow')) {
       await new Promise<void>(resolve => cancels.set(sessionId, resolve));

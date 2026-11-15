@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import type {
-  Agent, Avatar, Conversation, ConversationKind, ID, Message, MessageAuthor, Part, Project, Routine, Run, Schedule,
+  Agent, Avatar, Conversation, ConversationKind, Helper, ID, Message, MessageAuthor, Part, Project, Routine, Run, Schedule,
 } from '../shared/types.ts';
 import { modelChoices, type Choice, type SessionState } from './acp/mapping.ts';
 import type { CatalogEntry } from './agents/catalog.ts';
@@ -101,7 +101,8 @@ export class Store {
       .all(r.id).map(m => (m as Row).agent_id as string);
     return {
       id: r.id, kind: r.kind, title: r.title, avatar: r.avatar ? JSON.parse(r.avatar) : null, memberIds,
-      leadId: r.lead_id, projectId: r.project_id, hopLimit: r.hop_limit, lastMessage: this.lastMessage(r.id),
+      leadId: r.lead_id, projectId: r.project_id, helpers: r.helpers === null ? [] : this.helpersFor(memberIds[0], JSON.parse(r.helpers)),
+      parentId: r.parent_id, hopLimit: r.hop_limit, lastMessage: this.lastMessage(r.id),
       activeRuns: this.count(`SELECT COUNT(*) AS n FROM runs WHERE conversation_id = ? AND status IN ('queued', 'running')`, r.id),
       createdAt: r.created_at, updatedAt: r.updated_at,
     };
@@ -133,11 +134,19 @@ export class Store {
     return r ? this.conversationFrom(r) : null;
   }
 
-  insertConversation(c: { id?: ID; kind: ConversationKind; title: string; avatar: Avatar | null; memberIds: ID[]; leadId: ID | null; projectId: ID | null; hopLimit: number; requestedFrom?: ID }): Conversation {
+  // A Code thread starts with `helpers` (a fork passes its source's) or the person's last helper settings.
+  // A delegated thread (parentId set) has no helpers, so delegation never continues from a helper's thread.
+  insertConversation(c: {
+    id?: ID; kind: ConversationKind; title: string; avatar: Avatar | null; memberIds: ID[]; leadId: ID | null; projectId: ID | null; hopLimit: number;
+    requestedFrom?: ID; parentId?: ID; helpers?: Helper[];
+  }): Conversation {
     const id = c.id ?? newId();
     const at = now();
-    this.db.prepare(`INSERT INTO conversations (id, kind, title, avatar, lead_id, project_id, hop_limit, requested_from, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, c.kind, c.title, c.avatar && JSON.stringify(c.avatar), c.leadId, c.projectId, c.hopLimit, c.requestedFrom ?? null, at, at);
+    const helpers = c.kind === 'code' && !c.parentId ? c.helpers ?? this.helpersFor(c.memberIds[0], []) : null;
+    this.db.prepare(`INSERT INTO conversations (id, kind, title, avatar, lead_id, project_id, hop_limit, requested_from, parent_id, helpers, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      id, c.kind, c.title, c.avatar && JSON.stringify(c.avatar), c.leadId, c.projectId, c.hopLimit, c.requestedFrom ?? null, c.parentId ?? null,
+      helpers && JSON.stringify(helpers), at, at);
     this.setMembers(id, c.memberIds);
     return this.getConversation(id)!;
   }
@@ -154,6 +163,40 @@ export class Store {
       lead_id: patch.leadId, hop_limit: patch.hopLimit, updated_at: now(),
     });
     return this.getConversation(id)!;
+  }
+
+  // ---------- helpers ----------
+
+  // Every installed coding agent other than the thread's own: its entry in `stored`, else the person's last setting for it,
+  // else enabled with the agent's own defaults.
+  private helpersFor(ownAgentId: ID, stored: Helper[]): Helper[] {
+    const defaults = this.helperDefaults();
+    return this.helperAgentIds(ownAgentId).map(agentId =>
+      stored.find(h => h.agentId === agentId) ?? defaults.find(h => h.agentId === agentId) ?? { agentId, enabled: true, options: [] });
+  }
+
+  helperAgentIds(ownAgentId: ID): ID[] {
+    return this.db.prepare(`SELECT id FROM agents WHERE source = 'acp' AND hidden = 0 AND id != ? ORDER BY created_at, rowid`).all(ownAgentId)
+      .map(r => (r as Row).id as string);
+  }
+
+  private helperDefaults(): Helper[] {
+    const r = this.db.prepare(`SELECT value FROM settings WHERE key = 'helpers'`).get() as Row | undefined;
+    return r ? JSON.parse(r.value) : [];
+  }
+
+  // Replaces the thread's entries for the given agents and makes them the start of new Code threads.
+  setHelpers(conversationId: ID, changed: Helper[]): Conversation {
+    const merge = (list: Helper[]) => [...list.filter(h => !changed.some(c => c.agentId === h.agentId)), ...changed];
+    const conversation = this.getConversation(conversationId)!;
+    this.db.prepare('UPDATE conversations SET helpers = ? WHERE id = ?').run(JSON.stringify(merge(conversation.helpers)), conversationId);
+    this.db.prepare(`INSERT INTO settings (key, value) VALUES ('helpers', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`)
+      .run(JSON.stringify(merge(this.helperDefaults())));
+    return this.getConversation(conversationId)!;
+  }
+
+  childConversations(parentId: ID): ID[] {
+    return this.db.prepare('SELECT id FROM conversations WHERE parent_id = ?').all(parentId).map(r => (r as Row).id as string);
   }
 
   requestedFrom(id: ID): ID | null {
@@ -202,6 +245,11 @@ export class Store {
 
   setChapter(id: ID, chapter: string | null) {
     this.db.prepare('UPDATE messages SET chapter = ? WHERE id = ?').run(chapter, id);
+  }
+
+  runMessage(runId: ID): StoredMessage | null {
+    const r = this.db.prepare('SELECT * FROM messages WHERE run_id = ?').get(runId) as Row | undefined;
+    return r ? this.messageFrom(r) : null;
   }
 
   latestAgentMessage(conversationId: ID): StoredMessage | null {

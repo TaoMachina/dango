@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Bookmark, Bot, ChevronRight, FileDiff, FilePlus, Folder, GitBranch, Monitor } from 'lucide-react';
-import type { Agent, Conversation, Message, ThreadInfo } from '../../../shared/types.ts';
+import { Bookmark, Bot, ChevronDown, ChevronRight, FileDiff, FilePlus, Folder, GitBranch, Monitor } from 'lucide-react';
+import type { Agent, Conversation, Helper, Message, SessionOption, ThreadInfo } from '../../../shared/types.ts';
 import { Avatar } from '../components/Avatar.tsx';
+import { Popover, usePopover } from '../components/Popover.tsx';
+import { Switch } from '../components/ui.tsx';
 import { DiffView } from '../components/DiffView.tsx';
 import { OpenThreadButton, PlanMark, planProgress, SUBAGENT_STATUS, ToolRow, type TimelineContext } from '../code/CodeTimeline.tsx';
 import {
@@ -20,8 +22,8 @@ import {
   type Subagent,
 } from '../code/workLog.ts';
 import { CopyButton } from '../conversation/MessageActions.tsx';
-import { tokens } from '../conversation/SessionPickers.tsx';
-import { focusMessage, patchAgent, threadInfo } from '../lib/actions.ts';
+import { current, EffortSlider, effortLabel, isSelect, ModelList, pillClass, shortModel, tokens, type Select } from '../conversation/SessionPickers.tsx';
+import { focusMessage, loadAgentOptions, patchAgent, patchConversation, threadInfo } from '../lib/actions.ts';
 import { sessionKey, useStore } from '../lib/store.ts';
 import { DeleteButton } from './DeleteButton.tsx';
 
@@ -197,6 +199,82 @@ function SubagentModel({ agent, setting }: { agent: Agent; setting: NonNullable<
   );
 }
 
+/** The helper's options with the person's choices for this thread applied. */
+function chosenOptions(options: SessionOption[], helper: Helper): SessionOption[] {
+  return options.map((o) => {
+    const choice = helper.options.find((c) => c.optionId === o.id);
+    return choice ? ({ ...o, currentValue: choice.value } as SessionOption) : o;
+  });
+}
+
+/** One helper: who it is, whether the main agent may use it, and the model and effort it works with. */
+function HelperRow({ conversationId, helper }: { conversationId: string; helper: Helper }) {
+  const agent = useStore((s) => s.agents[helper.agentId]) as Agent | undefined;
+  const offered = useStore((s) => s.agentOptions[helper.agentId]?.options);
+  const pop = usePopover();
+  if (!agent) return null;
+  const options = chosenOptions(offered ?? [], helper);
+  const model = options.find((o) => isSelect(o, 'model')) as Select | undefined;
+  const effort = options.find((o) => isSelect(o, 'thought_level')) as Select | undefined;
+  const effortChoice = effort && current(effort);
+  const summary = [model && shortModel(current(model)?.name ?? model.currentValue), effortChoice && effortLabel(effortChoice)].filter(Boolean).join(' · ');
+  const save = (next: Partial<Helper>) => void patchConversation(conversationId, { helpers: [{ ...helper, ...next }] });
+  const set = (optionId: string, value: string | boolean) =>
+    save({ options: [...helper.options.filter((c) => c.optionId !== optionId), { optionId, value }] });
+
+  return (
+    <li className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+      <Avatar avatar={agent.avatar} size={24} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium">{agent.name}</span>
+        {summary && (
+          <button
+            ref={pop.anchor}
+            type="button"
+            aria-label={`${agent.name} model and effort: ${summary}`}
+            aria-expanded={pop.open !== null}
+            onClick={() => pop.setOpen(pop.open ? null : 'open')}
+            className={`${pillClass} -ml-2 h-6 max-w-full px-2 text-[12px]`}
+          >
+            <span className="truncate">{summary}</span>
+            <ChevronDown size={12} className="shrink-0 opacity-70" />
+          </button>
+        )}
+      </span>
+      <Switch checked={helper.enabled} label={`Let the main agent use ${agent.name}`} onChange={(enabled) => save({ enabled })} />
+      {pop.open && (
+        <Popover anchor={pop.anchor} onClose={pop.close} label={`${agent.name} model`} width={320} align="end">
+          {model && <ModelList model={model} set={set} />}
+          {effort && (
+            <div className={`px-3 pb-3 pt-2.5 ${model ? 'border-t border-line' : ''}`}>
+              <EffortSlider option={effort} onPick={(value) => set(effort.id, value)} />
+            </div>
+          )}
+        </Popover>
+      )}
+    </li>
+  );
+}
+
+/** Other coding agents the main agent may hand work to through Agentry, each with its own model and effort. */
+function Helpers({ conversation, agent }: { conversation: Conversation; agent: Agent }) {
+  const key = conversation.helpers.map((h) => h.agentId).join(',');
+  useEffect(() => {
+    for (const helper of conversation.helpers) void loadAgentOptions(helper.agentId);
+  }, [key]);
+  return (
+    <div className="pt-2">
+      <p className="px-2 text-[13px]">Helpers</p>
+      <p className="px-2 pb-1 text-[12px] leading-4 text-muted">{agent.name} can hand parts of the work to these agents.</p>
+      <ul>
+        {conversation.helpers.map((helper) => (
+          <HelperRow key={helper.agentId} conversationId={conversation.id} helper={helper} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // ---------- Outputs ----------
 
 function DiffStat({ added, removed }: { added: number; removed: number }) {
@@ -313,6 +391,7 @@ export function CodePanel({ conversation }: { conversation: Conversation }) {
   const context: TimelineContext = { catalogId, root: project?.path };
   const usage = session?.usage ?? null;
   const setting = agent?.subagentModel ?? null;
+  const helpers = conversation.helpers.length > 0;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -320,7 +399,7 @@ export function CodePanel({ conversation }: { conversation: Conversation }) {
         {info && <Where info={info} />}
         {usage && <Context used={usage.used} size={usage.size} />}
         {plan && <Plan plan={plan} />}
-        {(live.length > 0 || fromTools.length > 0 || setting) && (
+        {(live.length > 0 || fromTools.length > 0 || setting || helpers) && (
           <Section title="Subagents">
             {(live.length > 0 || fromTools.length > 0) && (
               <ul>
@@ -333,6 +412,7 @@ export function CodePanel({ conversation }: { conversation: Conversation }) {
               </ul>
             )}
             {agent && setting && <SubagentModel agent={agent} setting={setting} />}
+            {agent && helpers && <Helpers conversation={conversation} agent={agent} />}
           </Section>
         )}
         {changes.length > 0 && <Outputs changes={changes} root={project?.path} />}

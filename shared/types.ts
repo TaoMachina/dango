@@ -64,6 +64,15 @@ export interface Project {
 
 export type ConversationKind = 'chat' | 'group' | 'code';
 
+// Another coding agent the main agent of a Code thread may hand work to through Agentry (agentry_delegate).
+// options: the helper's own session options (model, effort, ...) applied to the child thread before its first prompt;
+// empty keeps the helper's defaults. Values are validated against the helper's draft options.
+export interface Helper {
+  agentId: ID;
+  enabled: boolean;
+  options: { optionId: string; value: string | boolean }[];
+}
+
 export interface Conversation {
   id: ID;
   kind: ConversationKind; // chat: one agent; group: several agents; code: one agent in a project
@@ -72,6 +81,9 @@ export interface Conversation {
   memberIds: ID[]; // agent IDs
   leadId: ID | null; // group: receives messages without mentions
   projectId: ID | null; // code threads
+  // Code threads: one entry per other installed coding agent. Empty for chats, groups and delegated threads.
+  helpers: Helper[];
+  parentId: ID | null; // a delegated Code thread: the thread whose agent started it (hidden from the Code list)
   hopLimit: number; // group: agent-to-agent mention depth
   lastMessage: { authorName: string; text: string; at: ISODate } | null;
   activeRuns: number;
@@ -248,7 +260,9 @@ export interface StateResponse {
 // POST   /api/conversations/:id/messages              { text, mentions?: ID[] } -> Message
 // POST   /api/conversations/:id/stop                  -> {}
 // POST   /api/conversations                           CreateConversationRequest -> Conversation
-// PATCH  /api/conversations/:id                       { title?, avatar?, memberIds?, leadId?, hopLimit? } -> Conversation
+// PATCH  /api/conversations/:id                       { title?, avatar?, memberIds?, leadId?, hopLimit?, helpers?: Helper[] } -> Conversation
+//                                                     helpers (code threads): entries replace those for the same agents; they also become
+//                                                     the starting helpers of new Code threads
 // DELETE /api/conversations/:id                       -> {} (groups and code threads only)
 // GET    /api/conversations/:id/info                  -> ThreadInfo (code threads: where the work happens)
 // POST   /api/conversations/:id/fork                  { messageId } -> Conversation (code threads; messageId must be the latest agent message: the native session is copied whole)

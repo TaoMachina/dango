@@ -14,7 +14,7 @@ before(async () => {
 after(() => t.close());
 
 const group = (leadId: string): Conversation => ({
-  id: 'g', kind: 'group', title: 'Room', avatar: null, memberIds: [one.id, two.id], leadId, projectId: null, hopLimit: 3,
+  id: 'g', kind: 'group', title: 'Room', avatar: null, memberIds: [one.id, two.id], leadId, projectId: null, helpers: [], parentId: null, hopLimit: 3,
   lastMessage: null, activeRuns: 0, createdAt: '', updatedAt: '',
 });
 

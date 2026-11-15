@@ -1,5 +1,6 @@
 // What an agent needs to know about Agentry in one session: who it is here and what it can do.
 import type { Agent, Conversation, Project } from '../../shared/types.ts';
+import type { HelperInfo } from '../helpers.ts';
 
 const describe = (a: Agent) => `@${a.name} (${a.runtimeLabel}${a.description ? `: ${a.description}` : ''})`;
 
@@ -30,17 +31,34 @@ const tools =
   'files here, then tell the person in one line that the work continues in Code (Agentry posts the link, so leave out ids). ' +
   'Answering questions and reading files is fine here.';
 
-// `project` is the code thread's project and null for chats and groups.
-export function sessionContext(conversation: Conversation, agent: Agent, members: Agent[], project: Project | null): string {
-  return contextLines(conversation, agent, members, project, tools);
+const helperText = (h: HelperInfo) => `${h.name} (${h.runtime}; model: ${h.model ?? 'its default'}; effort: ${h.effort ?? 'its default'})`;
+
+// The helpers the person allows in this Code thread and how to delegate to them. Empty when none is enabled.
+function helperLines(helpers: HelperInfo[]): string[] {
+  const enabled = helpers.filter(h => h.enabled);
+  if (enabled.length === 0) return [];
+  return [
+    `Helpers: ${enabled.map(helperText).join(', ')}. They are other coding agents on this computer that work in this same project folder. ` +
+    'To hand one a part of the work, call agentry_delegate with the helper\'s name and complete instructions: it does not see this conversation. ' +
+    'agentry_delegate returns the helper\'s final answer, or a delegationId while the helper is still working; then call agentry_wait_for_helper with it. ' +
+    'Check a helper\'s work before you rely on it. Your own subagents work as usual.',
+  ];
+}
+
+const delegatedLine = 'Another agent handed you this task through Agentry; its message starts with its name. ' +
+  'Your final message is returned to that agent as the result, so end with a complete answer.';
+
+// `project` is the code thread's project and null for chats and groups; `helpers` is empty outside Code threads.
+export function sessionContext(conversation: Conversation, agent: Agent, members: Agent[], project: Project | null, helpers: HelperInfo[] = []): string {
+  return contextLines(conversation, agent, members, project, tools, helpers);
 }
 
 // For agents the hub calls over an OpenAI-compatible API: they have no agentry tools, so the context leaves them out.
 export function apiContext(conversation: Conversation, agent: Agent, members: Agent[], project: Project | null): string {
-  return contextLines(conversation, agent, members, project, null);
+  return contextLines(conversation, agent, members, project, null, []);
 }
 
-function contextLines(conversation: Conversation, agent: Agent, members: Agent[], project: Project | null, toolText: string | null): string {
+function contextLines(conversation: Conversation, agent: Agent, members: Agent[], project: Project | null, toolText: string | null, helpers: HelperInfo[]): string {
   const lines = [`You are ${agent.name} in Agentry, an app where the person on this computer talks with their agents.`];
   if (conversation.kind === 'chat') {
     lines.push(toolText ? `This is your own chat with the person. ${toolText}` : 'This is your own chat with the person.');
@@ -52,16 +70,22 @@ function contextLines(conversation: Conversation, agent: Agent, members: Agent[]
       ...(toolText ? [toolText] : []),
     );
   } else {
-    lines.push(`You are working in project ${project!.name} at ${project!.path}.`);
+    lines.push(`You are working in project ${project!.name} at ${project!.path}.`, ...(conversation.parentId ? [delegatedLine] : []), ...helperLines(helpers));
   }
   return lines.join('\n');
 }
 
-// Identifies the group facts the context states, so a change can be announced to an existing session.
+// Identifies the group or helper facts the context states, so a change can be announced to an existing session.
 export function membershipKey(conversation: Conversation): string {
-  return conversation.kind === 'group' ? `${conversation.memberIds.join(',')}|${conversation.leadId}|${conversation.hopLimit}` : '';
+  if (conversation.kind === 'group') return `${conversation.memberIds.join(',')}|${conversation.leadId}|${conversation.hopLimit}`;
+  if (conversation.kind === 'code') return JSON.stringify(conversation.helpers.filter(h => h.enabled));
+  return '';
 }
 
-export function membershipUpdate(conversation: Conversation, agent: Agent, members: Agent[]): string {
+export function membershipUpdate(conversation: Conversation, agent: Agent, members: Agent[], helpers: HelperInfo[]): string {
+  if (conversation.kind === 'code') {
+    const lines = helperLines(helpers);
+    return lines.length > 0 ? `Helper update: ${lines.join(' ')}` : 'Helper update: no helpers are enabled now, so agentry_delegate refuses every helper.';
+  }
   return `Group update: members are now ${members.map(describe).join(', ')}. ${roleLines(conversation, agent, members).join(' ')}`;
 }

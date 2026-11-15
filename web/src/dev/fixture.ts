@@ -74,6 +74,8 @@ function conversation(id: ID, extra: Partial<Conversation>): Conversation {
     memberIds: [],
     leadId: null,
     projectId: null,
+    helpers: [],
+    parentId: null,
     hopLimit: 3,
     lastMessage: null,
     activeRuns: 0,

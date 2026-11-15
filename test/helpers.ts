@@ -51,9 +51,9 @@ export function rawRequest(port: number, method: string, path: string, headers: 
   });
 }
 
-export async function startTestHub(catalog: CatalogEntry[]): Promise<TestHub> {
+export async function startTestHub(catalog: CatalogEntry[], options: { delegateWaitMs?: number } = {}): Promise<TestHub> {
   const home = mkdtempSync(join(tmpdir(), 'agentry-test-'));
-  const hub = await createHub({ home, port: 0, catalog, userHome: home, webDist: null });
+  const hub = await createHub({ home, port: 0, catalog, userHome: home, webDist: null, ...options });
   const raw = (method: string, path: string, headers?: Record<string, string>, body?: unknown) => rawRequest(hub.port, method, path, headers, body);
 
   const { body: { code } } = await raw('POST', '/auth/code', { authorization: `Bearer ${hub.key}` });

@@ -43,6 +43,28 @@ server.registerTool('agentry_read_code_thread', {
   inputSchema: { conversation: z.string().describe('The Code thread id or title.') },
 }, args => call('POST', 'code-thread', args));
 
+server.registerTool('agentry_list_helpers', {
+  description: 'List the helpers of this Code thread: other coding agents you may delegate to, each with its runtime, whether the person enabled it, and its chosen model and effort (null: its own default).',
+}, () => call('GET', 'helpers'));
+
+server.registerTool('agentry_delegate', {
+  description: 'Hand part of the work to an enabled helper agent of this Code thread. Agentry starts the helper in a new thread in the same project folder ' +
+    'with the model and effort the person chose, and waits for its answer. The helper does not see this conversation, so give complete instructions. ' +
+    'Returns {status, result, thread} when the helper finishes in time. If it is still working, returns {status: "running", delegationId}: ' +
+    'call agentry_wait_for_helper with that delegationId until it finishes. Check the helper\'s work before relying on it.',
+  inputSchema: {
+    helper: z.string().describe('The helper\'s name, as agentry_list_helpers shows it.'),
+    task: z.string().describe('Complete instructions for the helper.'),
+    title: z.string().optional().describe('Short title for the helper\'s thread. Defaults to the first line of the task.'),
+  },
+}, args => call('POST', 'delegate', args));
+
+server.registerTool('agentry_wait_for_helper', {
+  description: 'Keep waiting for a helper that agentry_delegate reported as running. Returns {status, result, thread} once it finishes, ' +
+    'or {status: "running", delegationId} again: then call this tool again.',
+  inputSchema: { delegationId: z.string().describe('The delegationId agentry_delegate returned.') },
+}, args => call('POST', 'wait-for-helper', args));
+
 server.registerTool('agentry_create_routine', {
   description: 'Schedule a routine in the current conversation. When it fires, you receive the prompt here. Times are local. ' +
     'schedule: {kind:"daily",time:"HH:MM"} | {kind:"weekly",day:0-6 (0=Sunday),time:"HH:MM"} | {kind:"interval",minutes} | {kind:"once",at:ISO date-time}.',

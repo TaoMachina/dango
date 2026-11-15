@@ -30,7 +30,8 @@ export function CodeList() {
 
   const tree = useMemo(() => {
     const threads = Object.values(conversations)
-      .filter((c) => c.kind === 'code')
+      // A delegated thread opens from its parent's work log.
+      .filter((c) => c.kind === 'code' && !c.parentId)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return Object.values(projects)
       .sort((a, b) => a.name.localeCompare(b.name))

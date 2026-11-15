@@ -4,6 +4,7 @@ import type {
   Avatar,
   Conversation,
   CreateConversationRequest,
+  Helper,
   ID,
   Message,
   Project,
@@ -234,7 +235,7 @@ export async function createConversation(body: CreateConversationRequest) {
 
 export async function patchConversation(
   id: ID,
-  body: { title?: string; avatar?: Avatar; memberIds?: ID[]; leadId?: ID | null; hopLimit?: number },
+  body: { title?: string; avatar?: Avatar; memberIds?: ID[]; leadId?: ID | null; hopLimit?: number; helpers?: Helper[] },
 ) {
   upsert('conversations', await api<Conversation>('PATCH', `/api/conversations/${id}`, body));
 }

@@ -118,6 +118,7 @@ export class LiveRun {
     if (last && last.type === type && continues) {
       last.text += text;
       this.runs.events.emit({ type: 'message.append', conversationId: this.conversation.id, messageId: this.message!.id, partIndex: index, text });
+      this.runs.watchers.get(this.run.id)?.onParts(this);
     } else {
       this.pushPart({ type, text });
     }
@@ -139,6 +140,7 @@ export class LiveRun {
   private emitPart(index: number) {
     this.runs.store.saveMessage(this.message!);
     this.runs.events.emit({ type: 'message.part', conversationId: this.conversation.id, messageId: this.message!.id, partIndex: index, part: this.parts[index] });
+    this.runs.watchers.get(this.run.id)?.onParts(this);
   }
 
   // Shows the agent's own permission options as a card and waits for the person's choice.
@@ -187,6 +189,7 @@ export class LiveRun {
     this.run = store.updateRun(this.run.id, { status, error: status === 'error' ? note : null, endedAt: now() });
     this.runs.lives.delete(this.run.id);
     this.runs.emitRun(this.run);
+    this.runs.ended(this.run.id);
     this.runs.emitConversation(this.conversation.id);
     this.runs.emitAgent(this.agent.id);
     this.runs.reportToRequester(this.conversation, this.agent, status);
@@ -216,10 +219,17 @@ export class LiveRun {
   }
 }
 
+// Follows one run: its parts as they stream, and its end. Agentry's delegation shows a helper's run in its parent's reply this way.
+export interface RunWatcher {
+  onParts(live: LiveRun): void;
+  onEnd(run: StoredRun): void;
+}
+
 export class Runs {
   store: Store;
   events: Events;
   lives = new Map<ID, LiveRun>();
+  watchers = new Map<ID, RunWatcher>();
   permissions = new Map<string, { live: LiveRun; index: number; resolve: (answer: PermissionAnswer) => void }>();
   executors: Record<Agent['source'], Executor> | null = null;
   // Runs for the same agent session run one after another: ACP allows one prompt per session at a time.
@@ -310,6 +320,7 @@ export class Runs {
     const agent = this.store.getAgent(run.agentId);
     if (!agent) {
       this.store.updateRun(run.id, { status: 'error', error: 'The agent was removed.', endedAt: now() });
+      this.ended(run.id);
       return;
     }
     const live = new LiveRun(this, run, conversation, agent);
@@ -331,7 +342,15 @@ export class Runs {
     this.postMessage(requester, { type: 'system' }, text);
   }
 
-  // Stop cancels every queued and active run in the conversation. A stopped run never resumes.
+  // Tells the run's watcher that the run ended, once.
+  ended(runId: ID) {
+    const watcher = this.watchers.get(runId);
+    if (!watcher) return;
+    this.watchers.delete(runId);
+    watcher.onEnd(this.store.getRun(runId)!);
+  }
+
+  // Stop cancels every queued and active run in the conversation and in the threads it delegated to. A stopped run never resumes.
   stop(conversationId: ID) {
     for (const run of this.store.activeRuns(conversationId)) {
       const live = this.lives.get(run.id);
@@ -339,8 +358,10 @@ export class Runs {
         live.stop();
       } else {
         this.emitRun(this.store.updateRun(run.id, { status: 'stopped', endedAt: now() }));
+        this.ended(run.id);
       }
     }
+    for (const child of this.store.childConversations(conversationId)) this.stop(child);
     this.emitConversation(conversationId);
   }
 

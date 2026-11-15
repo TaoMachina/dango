@@ -11,6 +11,7 @@ import { connectSchema, type UrlAgents } from './url-agent.ts';
 import { parse, Router } from './http.ts';
 import { pickFolder } from './folder-picker.ts';
 import { gitBranch } from './git.ts';
+import { checkChoices } from './helpers.ts';
 import { addFolder, createNamed, HttpError, newTaskFolder } from './projects.ts';
 import { scheduleSchema, type Routines } from './routines.ts';
 import { publicRun, type Runs } from './routing.ts';
@@ -64,6 +65,8 @@ export function apiRoutes(d: ApiDeps): Router {
   const emitConversation = (c: Conversation) => events.emit({ type: 'conversation.upsert', conversation: c });
   const removeConversation = (id: ID) => {
     runs.stop(id);
+    // Delegated threads belong to their parent and go with it.
+    for (const child of store.childConversations(id)) removeConversation(child);
     const routineIds = store.listRoutines().filter(r => r.conversationId === id).map(r => r.id);
     store.deleteConversation(id);
     for (const routineId of routineIds) events.emit({ type: 'routine.removed', routineId });
@@ -123,12 +126,7 @@ export function apiRoutes(d: ApiDeps): Router {
         const worker = agent(body.agentId);
         // A url agent has no access to this computer's folders.
         if (worker.source === 'url') throw new HttpError(400, 'Agents connected by URL cannot work in a project on this computer.');
-        const offered = worker.source === 'acp' ? d.acp.draftOptions(worker).options : [];
-        for (const choice of body.options ?? []) {
-          const option = offered.find(o => o.id === choice.optionId);
-          const valid = option && (option.type === 'boolean' ? typeof choice.value === 'boolean' : option.choices.some(c => c.value === choice.value));
-          if (!valid) throw new HttpError(400, `${JSON.stringify(choice.value)} is not a choice for ${choice.optionId}.`);
-        }
+        checkChoices(worker.source === 'acp' ? d.acp.draftOptions(worker).options : [], body.options ?? []);
         const project = body.projectId === null ? newTaskFolder(store, events, d.projectsDir, body.title) : store.getProject(body.projectId);
         if (!project) throw new HttpError(404, 'Project not found.');
         created = store.insertConversation({
@@ -145,8 +143,20 @@ export function apiRoutes(d: ApiDeps): Router {
       const body = parse(z.object({
         title: name.optional(), avatar: avatarSchema.nullable().optional(), memberIds: z.array(z.string()).min(1).optional(),
         leadId: z.string().nullable().optional(), hopLimit: z.number().int().min(0).optional(),
+        helpers: z.array(z.object({
+          agentId: z.string(), enabled: z.boolean(), options: z.array(z.object({ optionId: z.string(), value: z.union([z.string(), z.boolean()]) })),
+        })).optional(),
       }), c.body);
       if (conv.kind !== 'group' && (body.memberIds || body.leadId !== undefined)) throw new HttpError(400, 'Only groups change members or lead.');
+      if (body.helpers) {
+        if (conv.kind !== 'code' || conv.parentId) throw new HttpError(400, 'Only Code threads the person started have helpers.');
+        const allowed = store.helperAgentIds(conv.memberIds[0]);
+        for (const helper of body.helpers) {
+          if (!allowed.includes(helper.agentId)) throw new HttpError(400, 'A helper must be another coding agent on this computer.');
+          checkChoices(d.acp.draftOptions(agent(helper.agentId)).options, helper.options);
+        }
+        store.setHelpers(conv.id, body.helpers);
+      }
       const memberIds = body.memberIds ? [...new Set(body.memberIds)] : conv.memberIds;
       memberIds.forEach(agent);
       let leadId = body.leadId === undefined ? conv.leadId : body.leadId;
@@ -187,6 +197,7 @@ export function apiRoutes(d: ApiDeps): Router {
       const forked = await d.acp.forkSession(worker, source, draft);
       store.insertConversation({
         id: draft.id, kind: 'code', title: draft.title, avatar: null, memberIds: [worker.id], leadId: null, projectId: source.projectId, hopLimit: 0,
+        helpers: source.helpers,
       });
       store.saveAcpSession(worker.id, draft.id, forked.sessionId, forked.cwd);
       store.saveUsage(worker.id, draft.id, store.getAcpSession(worker.id, source.id)!.usage);

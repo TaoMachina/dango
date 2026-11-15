@@ -150,6 +150,19 @@ const migrations: string[] = [
   -- A label the person gave the message as a chapter of its thread.
   ALTER TABLE messages ADD COLUMN chapter TEXT;
   `,
+  `
+  -- A Code thread's helpers (JSON Helper[]), the agents its main agent may delegate to. NULL for chats, groups and delegated threads.
+  ALTER TABLE conversations ADD COLUMN helpers TEXT;
+  -- Existing Code threads start with no stored entries, so every helper reads as its default.
+  UPDATE conversations SET helpers = '[]' WHERE kind = 'code';
+  -- A delegated Code thread belongs to the thread that started it.
+  ALTER TABLE conversations ADD COLUMN parent_id TEXT REFERENCES conversations(id) ON DELETE CASCADE;
+  -- Hub-wide settings as JSON values; 'helpers' holds the last helper settings per agent, the start of new Code threads.
+  CREATE TABLE settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+  `,
 ];
 
 export function openDb(file: string): DatabaseSync {
