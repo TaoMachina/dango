@@ -45,28 +45,34 @@ export class External implements Executor {
     this.hubUrl = hubUrl;
   }
 
-  create(name: string): { agent: Agent; instruction: string } {
-    const agent = createAgentWithChat(this.store, this.events, { name, source: 'external', catalogId: null, runtimeLabel: 'External agent', status: 'offline' });
-    return { agent, instruction: this.instruction(agent.id) };
+  // A fresh invitation. No agent exists until it calls the hub, so an unused copy leaves nothing behind.
+  invite(): string {
+    const token = randomToken();
+    this.store.insertInvitation(hashToken(token));
+    return this.text(token, null);
   }
 
-  // Issues a new token (replacing the old one) and returns the text to paste into the agent.
+  // Issues a new token for a joined agent (replacing the old one).
   instruction(agentId: ID): string {
     const agent = this.store.getAgent(agentId)!;
     const token = randomToken();
     this.store.replaceAgentToken(agentId, hashToken(token));
+    return this.text(token, agent.name);
+  }
+
+  private text(token: string, name: string | null): string {
     const url = this.hubUrl();
     const auth = `-H "Authorization: Bearer ${token}"`;
     const json = '-H "Content-Type: application/json"';
     return [
-      `You are invited to join Agentry${agent.name === NEW_AGENT_NAME ? '' : ` as "${agent.name}"`}. Agentry is an app on this computer where a person chats with all of their AI agents in one place, alone or in groups.`,
+      `You are invited to join Agentry${name ? ` as "${name}"` : ''}. Agentry is an app on this computer where a person chats with all of their AI agents in one place, alone or in groups.`,
       '',
       `Agentry hub: ${url}`,
       `Your token: ${token}`,
       'Send it on every call as the header: Authorization: Bearer <token>',
       '',
-      '1. Say hello once. Set your name, your product, a one-line description, and greet the person in one short line:',
-      `curl -s -X POST ${url}/agent-api/hello ${auth} ${json} -d '{"name":"${agent.name === NEW_AGENT_NAME ? '<your name>' : agent.name}","runtime":"<your product>","description":"<one line>","greeting":"<one short line>"}'`,
+      '1. Say hello once. Use the name the person knows you by, your product, a one-line description, and greet the person in one short line:',
+      `curl -s -X POST ${url}/agent-api/hello ${auth} ${json} -d '{"name":"${name ?? '<your name>'}","runtime":"<your product>","description":"<one line>","greeting":"<one short line>"}'`,
       '',
       `2. Wait for work. This call returns pending prompts, or [] after ${MAX_WAIT_SECONDS} seconds. Call it again right away and keep polling:`,
       `curl -s "${url}/agent-api/inbox?wait=${MAX_WAIT_SECONDS}" ${auth}`,
@@ -82,13 +88,22 @@ export class External implements Executor {
     ].join('\n');
   }
 
+  // A known token names its agent; an unused invitation creates the agent on its first call.
   authenticate(token: string | null): ID | null {
-    return token ? this.store.agentForToken(hashToken(token)) : null;
+    if (!token) return null;
+    const hash = hashToken(token);
+    const known = this.store.agentForToken(hash);
+    if (known || !this.store.takeInvitation(hash)) return known;
+    const agent = createAgentWithChat(this.store, this.events, { name: NEW_AGENT_NAME, source: 'external', catalogId: null, runtimeLabel: 'External agent', status: 'offline' });
+    this.store.replaceAgentToken(agent.id, hash);
+    return agent.id;
   }
 
   hello(agentId: ID, input: z.infer<typeof helloSchema>) {
-    let agent = this.store.updateAgent(agentId, { name: input.name, runtimeLabel: input.runtime, description: input.description });
-    if (input.name) this.store.updateConversation(agent.chatId, { title: input.name });
+    // An agent without a name of its own goes by its product name; with neither it stays "New agent".
+    const name = input.name ?? input.runtime;
+    let agent = this.store.updateAgent(agentId, { name, runtimeLabel: input.runtime, description: input.description });
+    if (name) this.store.updateConversation(agent.chatId, { title: name });
     this.markPolled(agentId);
     agent = this.store.getAgent(agentId)!;
     this.events.emit({ type: 'agent.upsert', agent });

@@ -189,10 +189,9 @@ export async function rescan() {
   return agents;
 }
 
-export async function createExternalAgent(name: string) {
-  const result = await api<{ agent: Agent; instruction: string }>('POST', '/api/agents/external', { name });
-  upsert('agents', result.agent);
-  return result;
+// The agent itself appears (through agent.upsert) when it pastes the instruction and says hello.
+export async function inviteAgent() {
+  return api<{ instruction: string }>('POST', '/api/agents/external', {});
 }
 
 // ---------- Conversations ----------

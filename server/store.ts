@@ -371,6 +371,15 @@ export class Store {
     this.db.prepare('INSERT INTO agent_tokens (token_hash, agent_id, created_at) VALUES (?, ?, ?)').run(hash, agentId, now());
   }
 
+  insertInvitation(hash: string) {
+    this.db.prepare('INSERT INTO invitations (token_hash, created_at) VALUES (?, ?)').run(hash, now());
+  }
+
+  // Removes the invitation and reports whether it existed, so each invitation is claimed once.
+  takeInvitation(hash: string): boolean {
+    return this.db.prepare('DELETE FROM invitations WHERE token_hash = ?').run(hash).changes > 0;
+  }
+
   agentForToken(hash: string): ID | null {
     const r = this.db.prepare('SELECT agent_id FROM agent_tokens WHERE token_hash = ?').get(hash) as Row | undefined;
     return r ? r.agent_id : null;

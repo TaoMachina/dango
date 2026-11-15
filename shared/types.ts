@@ -220,7 +220,7 @@ export interface StateResponse {
 // POST   /api/permissions/:requestId                  { optionId } | { cancel: true } -> {}
 // PATCH  /api/agents/:id                              { name?, avatar?, description?, hidden? } -> Agent
 // POST   /api/agents/rescan                           -> { agents: Agent[] }
-// POST   /api/agents/external                         { name } -> { agent: Agent; instruction: string }
+// POST   /api/agents/external                         -> { instruction: string } (the agent appears when it first calls the hub)
 // POST   /api/agents/:id/instruction                  -> { instruction: string } (external agents; issues a new token)
 // DELETE /api/agents/:id                              -> {} (external agents only)
 // POST   /api/projects                                { path } | { name } -> Project

@@ -127,6 +127,13 @@ const migrations: string[] = [
   -- A code thread started with agentry_start_code_task reports each finished run to the conversation that asked for it.
   ALTER TABLE conversations ADD COLUMN requested_from TEXT REFERENCES conversations(id) ON DELETE SET NULL;
   `,
+  `
+  -- Copied invitations. The agent appears only when it first calls the hub with the token.
+  CREATE TABLE invitations (
+    token_hash TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL
+  );
+  `,
 ];
 
 export function openDb(file: string): DatabaseSync {

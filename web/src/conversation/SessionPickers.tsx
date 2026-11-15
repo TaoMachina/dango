@@ -29,6 +29,41 @@ function capitalize(text: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** "Opus 5.5" -> family "opus", version [5, 5]; "6.1 Sol" -> "sol", [6, 1]. */
+function modelFamily(name: string) {
+  const short = shortModel(name);
+  const match = short.match(/\d+(?:\.\d+)*/);
+  return {
+    family: short.replace(/\d+(?:\.\d+)*/g, '').replace(/\s+/g, ' ').trim().toLowerCase(),
+    version: match ? match[0].split('.').map(Number) : null,
+  };
+}
+
+function newer(a: number[], b: number[]) {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+  }
+  return false;
+}
+
+// Agents list every model they still serve; the newest of each family (plus the current one) covers normal use.
+function latestModels(model: Select) {
+  const best = new Map<string, { value: string; version: number[] }>();
+  for (const choice of model.choices) {
+    const { family, version } = modelFamily(choice.name);
+    if (!version) continue;
+    const seen = best.get(family);
+    if (!seen || newer(version, seen.version)) best.set(family, { value: choice.value, version });
+  }
+  const keep = new Set([...best.values()].map((b) => b.value));
+  return model.choices.filter((c) => !modelFamily(c.name).version || keep.has(c.value) || c.value === model.currentValue);
+}
+
+// 'default' lets the agent decide, so it reads better as Auto on a strength scale.
+function effortLabel(choice: Select['choices'][number]) {
+  return choice.value === 'default' ? 'Auto' : capitalize(choice.name);
+}
+
 function isSelect(option: SessionOption | undefined, category: string): option is Select {
   return option?.type === 'select' && option.category === category;
 }
@@ -59,7 +94,8 @@ export function SessionControls({ conversationId, agentId }: { conversationId: I
 function ModelPicker({ model, effort, more, set }: { model?: Select; effort?: Select; more: SessionOption[]; set: SetOption }) {
   const pop = usePopover();
   const modelName = model && shortModel(current(model)?.name ?? model.currentValue);
-  const effortName = effort && capitalize(current(effort)?.name ?? effort.currentValue);
+  const effortChoice = effort && current(effort);
+  const effortName = effort && (effortChoice ? effortLabel(effortChoice) : capitalize(effort.currentValue));
   const summary = [modelName, effortName].filter(Boolean).join(' · ') || 'Options';
 
   return (
@@ -77,17 +113,10 @@ function ModelPicker({ model, effort, more, set }: { model?: Select; effort?: Se
       </button>
       {pop.open && (
         <Popover anchor={pop.anchor} onClose={pop.close} label="Model" width={320}>
-          {model && (
-            <div role="radiogroup" aria-label={model.name} className="p-1.5">
-              {model.choices.map((choice) => (
-                <ChoiceRow key={choice.value} option={model} choice={choice} onPick={() => set(model.id, choice.value)} />
-              ))}
-            </div>
-          )}
+          {model && <ModelList model={model} set={set} />}
           {effort && (
-            <div className={`px-3 pb-3 pt-2 ${model ? 'border-t border-line' : ''}`}>
-              <p className="pb-1.5 text-[12px] text-muted">{effort.name}</p>
-              <Segmented option={effort} onPick={(value) => set(effort.id, value)} />
+            <div className={`px-3 pb-3 pt-2.5 ${model ? 'border-t border-line' : ''}`}>
+              <EffortSlider option={effort} onPick={(value) => set(effort.id, value)} />
             </div>
           )}
           {more.length > 0 && <More options={more} set={set} />}
@@ -117,26 +146,65 @@ function ChoiceRow(props: { option: Select; choice: Select['choices'][number]; o
   );
 }
 
-function Segmented({ option, onPick }: { option: Select; onPick: (value: string) => void }) {
+function ModelList({ model, set }: { model: Select; set: SetOption }) {
+  const [all, setAll] = useState(false);
+  const latest = latestModels(model);
+  const shown = all ? model.choices : latest;
+  const hidden = model.choices.length - latest.length;
   return (
-    // Wraps instead of truncating: Codex offers six effort levels, more than one row holds at popover width.
-    <div role="radiogroup" aria-label={option.name} className="flex flex-wrap gap-y-0.5 rounded-lg bg-field p-0.5">
-      {option.choices.map((choice) => {
-        const selected = choice.value === option.currentValue;
-        return (
+    <div role="radiogroup" aria-label={model.name} className="max-h-[340px] overflow-y-auto p-1.5">
+      {shown.map((choice) => (
+        <ChoiceRow key={choice.value} option={model} choice={choice} onPick={() => set(model.id, choice.value)} />
+      ))}
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setAll(!all)}
+          className="flex h-8 w-full items-center gap-1 rounded-lg px-2.5 text-[13px] text-muted hover:bg-hover hover:text-fg"
+        >
+          {all ? 'Show latest only' : `Show all models (${hidden} older)`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Thinking strength as a draggable scale: one stop per level the agent offers, in the agent's order. */
+function EffortSlider({ option, onPick }: { option: Select; onPick: (value: string) => void }) {
+  const index = Math.max(0, option.choices.findIndex((c) => c.value === option.currentValue));
+  const last = option.choices.length - 1;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between pb-1">
+        <span className="text-[12px] text-muted">{option.name}</span>
+        <span className="text-[13px] font-medium">{effortLabel(option.choices[index])}</span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={last}
+        step={1}
+        value={index}
+        aria-label={option.name}
+        aria-valuetext={effortLabel(option.choices[index])}
+        onChange={(e) => onPick(option.choices[Number(e.target.value)].value)}
+        className="effort-slider w-full"
+      />
+      <div className="relative mt-0.5 h-4 text-[11px] text-faint">
+        {option.choices.map((choice, i) => (
           <button
             key={choice.value}
             type="button"
-            role="radio"
-            aria-checked={selected}
-            title={choice.description ?? undefined}
+            tabIndex={-1}
             onClick={() => onPick(choice.value)}
-            className={`h-7 flex-1 whitespace-nowrap rounded-md px-2 text-[13px] transition-colors ${selected ? 'bg-bg text-fg shadow-[0_1px_2px_rgb(0_0_0/0.08)] dark:bg-code' : 'text-muted hover:text-fg'}`}
+            // Labels sit under their stops; the end labels align to the track edges so they stay inside the popover.
+            style={{ left: `${last ? (i / last) * 100 : 0}%`, transform: i === 0 ? 'none' : i === last ? 'translateX(-100%)' : 'translateX(-50%)' }}
+            className={`absolute top-0 whitespace-nowrap hover:text-fg ${i === index ? 'text-fg' : ''}`}
           >
-            {capitalize(choice.name)}
+            {effortLabel(choice)}
           </button>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 }

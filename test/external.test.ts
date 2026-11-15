@@ -7,10 +7,11 @@ let t: TestHub;
 before(async () => { t = await startTestHub([]); });
 after(() => t.close());
 
-test('an external agent says hello, fetches its inbox and replies', async () => {
-  const { agent, instruction } = await t.api<{ agent: Agent; instruction: string }>('POST', '/api/agents/external', { name: 'Scout' });
-  assert.equal(agent.source, 'external');
-  assert.equal(agent.status, 'offline');
+test('an invited agent joins under its own name, fetches its inbox and replies', async () => {
+  const agentsBefore = (await t.api<{ agents: Agent[] }>('GET', '/api/state')).agents.length;
+  const { instruction } = await t.api<{ instruction: string }>('POST', '/api/agents/external', {});
+  // An unused invitation leaves nothing in the agent list.
+  assert.equal((await t.api<{ agents: Agent[] }>('GET', '/api/state')).agents.length, agentsBefore);
   const token = instruction.match(/Your token: ([0-9a-f]+)/)![1];
   assert.match(instruction, new RegExp(`${t.hub.url}/agent-api/inbox\\?wait=25`));
   const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
@@ -18,6 +19,9 @@ test('an external agent says hello, fetches its inbox and replies', async () => 
   assert.equal((await t.raw('GET', '/agent-api/inbox', { authorization: 'Bearer nope' })).status, 401);
   const hello = await t.raw('POST', '/agent-api/hello', auth, { name: 'Scout Prime', runtime: 'Custom', greeting: 'Hi, Scout here.' });
   assert.equal(hello.status, 200);
+  const agent = (await t.api<{ agents: Agent[] }>('GET', '/api/state')).agents.find(a => a.id === hello.body.agent.id)!;
+  assert.equal(agent.source, 'external');
+  assert.equal(agent.name, 'Scout Prime');
   const greeting = await finishedReply(t, agent.chatId, agent.id);
   assert.equal(textOf(greeting), 'Hi, Scout here.');
   await waitFor(() => t.events.some(e => e.type === 'agent.upsert' && e.agent.id === agent.id && e.agent.name === 'Scout Prime' && e.agent.status === 'ready'), 'renamed and ready');

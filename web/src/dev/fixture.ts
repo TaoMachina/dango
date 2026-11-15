@@ -509,13 +509,8 @@ export async function fixtureFetch(url: string, init: RequestInit): Promise<Resp
   }
   if (method === 'POST' && path === '/api/agents/rescan') return json({ agents: structuredClone(agents) });
   if (method === 'POST' && path === '/api/agents/external') {
-    const a = agent(id('ext'), body.name as string, { source: 'external', runtimeLabel: 'External agent', status: 'offline', avatar: { kind: 'blob', color: '#7B6CF6', shape: 5, face: 3 } });
-    agents.push(a);
-    conversations.push(conversation(a.chatId, { title: a.name, memberIds: [a.id] }));
-    emit({ type: 'conversation.upsert', conversation: structuredClone(conversations.at(-1)!) });
     return json({
-      agent: a,
-      instruction: `You are joining Agentry as "${a.name}".\n\n1. Read your inbox: GET http://127.0.0.1:7420/api/external/inbox\n2. Post replies: POST http://127.0.0.1:7420/api/external/messages\n\nUse this header on every request:\nAuthorization: Bearer agentry_sample_token\n\nSay hello in your chat when you are connected.`,
+      instruction: `You are invited to join Agentry.\n\nAgentry hub: http://127.0.0.1:7420\nYour token: sample_token\n\n1. Say hello once with your own name:\ncurl -s -X POST http://127.0.0.1:7420/agent-api/hello -H "Authorization: Bearer sample_token" -d '{"name":"<your name>"}'`,
     });
   }
   if ((m = path.match(/^\/api\/agents\/([^/]+)$/))) {

@@ -1,43 +1,24 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Avatar } from '../components/Avatar.tsx';
 import { CopyBox } from '../components/CopyBox.tsx';
-import { Button, inputClass, Label } from '../components/ui.tsx';
-import { createExternalAgent, patchAgent } from '../lib/actions.ts';
+import { Button } from '../components/ui.tsx';
+import { inviteAgent, patchAgent } from '../lib/actions.ts';
 import { useStore } from '../lib/store.ts';
 
+// Opening the form makes an invitation right away: copy, paste into the agent, and it joins under its own name.
 export function AddAgentForm() {
   const agents = useStore((s) => s.agents);
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
   const [instruction, setInstruction] = useState<string | null>(null);
   const hidden = useMemo(() => Object.values(agents).filter((a) => a.hidden), [agents]);
 
+  useEffect(() => {
+    void inviteAgent().then((result) => setInstruction(result.instruction));
+  }, []);
+
   return (
     <div className="p-4">
-      {instruction ? (
-        <>
-          <p className="mb-2 text-[14px]">Paste this into your agent. It will join and say hello.</p>
-          <CopyBox text={instruction} />
-        </>
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setBusy(true);
-            void createExternalAgent(name.trim())
-              .then((result) => setInstruction(result.instruction))
-              .finally(() => setBusy(false));
-          }}
-        >
-          <Label htmlFor="agent-name">Name (optional — the agent introduces itself)</Label>
-          <div className="flex gap-2">
-            <input id="agent-name" className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="Hermes" />
-            <Button type="submit" variant="primary" disabled={busy}>
-              Get instruction
-            </Button>
-          </div>
-        </form>
-      )}
+      <p className="mb-2 text-[14px]">Paste this into your agent. It joins with its own name and says hello.</p>
+      {instruction ? <CopyBox text={instruction} /> : <div className="h-[120px] rounded-xl bg-field" aria-busy="true" />}
       {hidden.length > 0 && (
         <div className="mt-4 border-t border-line pt-3">
           <p className="mb-1 text-[13px] text-muted">Hidden agents</p>

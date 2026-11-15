@@ -167,3 +167,50 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Thinking-strength slider: a thin neutral track and a round thumb, the same in every browser. */
+.effort-slider {
+  appearance: none;
+  background: transparent;
+  height: 20px;
+  cursor: pointer;
+}
+.effort-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--field);
+}
+.effort-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--field);
+}
+.effort-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1.5px solid var(--fg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+}
+.effort-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1.5px solid var(--fg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+}
+.effort-slider:focus-visible {
+  outline: none;
+}
+.effort-slider:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.effort-slider:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

@@ -1,4 +1,4 @@
-﻿// Browser API routes (/api/*). The contract is in shared/types.ts.
+// Browser API routes (/api/*). The contract is in shared/types.ts.
 import { hostname } from 'node:os';
 import { z } from 'zod';
 import type { Agent, Conversation, ID, SessionInfo, StateResponse } from '../shared/types.ts';
@@ -6,7 +6,7 @@ import type { AcpHost } from './acp/host.ts';
 import type { CatalogEntry } from './agents/catalog.ts';
 import { defaultAvatar, rescan } from './agents/registry.ts';
 import type { Events } from './events.ts';
-import { NEW_AGENT_NAME, type External } from './external.ts';
+import type { External } from './external.ts';
 import { parse, Router } from './http.ts';
 import { pickFolder } from './folder-picker.ts';
 import { addFolder, createNamed, HttpError } from './projects.ts';
@@ -183,7 +183,7 @@ export function apiRoutes(d: ApiDeps): Router {
 
     .on('POST', '/api/agents/rescan', () => ({ agents: rescan(store, events, d.catalog) }))
 
-    .on('POST', '/api/agents/external', c => d.external.create(parse(z.object({ name: z.string().trim().optional() }), c.body).name || NEW_AGENT_NAME))
+    .on('POST', '/api/agents/external', () => ({ instruction: d.external.invite() }))
 
     .on('POST', '/api/agents/:id/instruction', c => {
       const a = agent(c.params.id);
