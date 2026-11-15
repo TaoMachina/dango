@@ -6,18 +6,18 @@ import { Switch } from '../components/ui.tsx';
 import { setSessionOption } from '../lib/actions.ts';
 import { sessionKey, useStore } from '../lib/store.ts';
 
-type Select = Extract<SessionOption, { type: 'select' }>;
-type SetOption = (id: string, value: string | boolean) => void;
+export type Select = Extract<SessionOption, { type: 'select' }>;
+export type SetOption = (id: string, value: string | boolean) => void;
 
-const pillClass =
+export const pillClass =
   'inline-flex h-7 min-w-0 items-center gap-1 rounded-full px-2.5 text-[13px] text-muted transition-colors hover:bg-hover hover:text-fg aria-expanded:bg-hover aria-expanded:text-fg';
 
-function current(option: Select) {
+export function current(option: Select) {
   return option.choices.find((c) => c.value === option.currentValue);
 }
 
 /** "Claude Opus 4.7 (1M context)" -> "Opus 4.7": drop the vendor prefix and any qualifier. */
-function shortModel(name: string) {
+export function shortModel(name: string) {
   return name
     .replace(/\s*\([^)]*\)/g, '')
     .split(/\s[—–-]\s|:\s/)[0]
@@ -60,11 +60,11 @@ function latestModels(model: Select) {
 }
 
 // 'default' lets the agent decide, so it reads better as Auto on a strength scale.
-function effortLabel(choice: Select['choices'][number]) {
+export function effortLabel(choice: Select['choices'][number]) {
   return choice.value === 'default' ? 'Auto' : capitalize(choice.name);
 }
 
-function isSelect(option: SessionOption | undefined, category: string): option is Select {
+export function isSelect(option: SessionOption | undefined, category: string): option is Select {
   return option?.type === 'select' && option.category === category;
 }
 
@@ -138,7 +138,7 @@ function ModelPicker({ model, effort, more, set, compact }: { model?: Select; ef
   );
 }
 
-function ChoiceRow(props: { option: Select; choice: Select['choices'][number]; onPick: () => void; compact?: boolean; wrap?: boolean }) {
+export function ChoiceRow(props: { option: Select; choice: Select['choices'][number]; onPick: () => void; compact?: boolean; wrap?: boolean }) {
   const { option, choice, onPick, compact, wrap } = props;
   const selected = choice.value === option.currentValue;
   return (
@@ -158,7 +158,7 @@ function ChoiceRow(props: { option: Select; choice: Select['choices'][number]; o
   );
 }
 
-function ModelList({ model, set }: { model: Select; set: SetOption }) {
+export function ModelList({ model, set }: { model: Select; set: SetOption }) {
   const [all, setAll] = useState(false);
   const latest = latestModels(model);
   const shown = all ? model.choices : latest;
@@ -182,7 +182,7 @@ function ModelList({ model, set }: { model: Select; set: SetOption }) {
 }
 
 /** Thinking strength as a draggable scale: one stop per level the agent offers, in the agent's order. */
-function EffortSlider({ option, onPick }: { option: Select; onPick: (value: string) => void }) {
+export function EffortSlider({ option, onPick }: { option: Select; onPick: (value: string) => void }) {
   const index = Math.max(0, option.choices.findIndex((c) => c.value === option.currentValue));
   const last = option.choices.length - 1;
   return (
@@ -258,7 +258,7 @@ function More({ options, set }: { options: SessionOption[]; set: SetOption }) {
   );
 }
 
-function ModePicker({ mode, set }: { mode: Select; set: SetOption }) {
+export function ModePicker({ mode, set }: { mode: Select; set: SetOption }) {
   const pop = usePopover();
   const name = current(mode)?.name ?? mode.currentValue;
   return (

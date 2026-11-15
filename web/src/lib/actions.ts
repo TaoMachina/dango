@@ -1,5 +1,6 @@
 import type {
   Agent,
+  AgentOptions,
   Avatar,
   Conversation,
   CreateConversationRequest,
@@ -159,6 +160,15 @@ export function answerPermission(requestId: ID, optionId: string) {
 
 export function storeSession(session: SessionInfo) {
   setState((s) => ({ sessions: { ...s.sessions, [sessionKey(session.conversationId, session.agentId)]: session } }));
+}
+
+export function storeAgentOptions(options: AgentOptions) {
+  setState((s) => ({ agentOptions: { ...s.agentOptions, [options.agentId]: options } }));
+}
+
+/** Model, effort and mode choices for a new Code thread; an agent that never ran starts and reports them through agent.options. */
+export async function loadAgentOptions(agentId: ID) {
+  storeAgentOptions(await api<AgentOptions>('POST', `/api/agents/${agentId}/options`));
 }
 
 export async function openSession(conversationId: ID, agentId: ID) {

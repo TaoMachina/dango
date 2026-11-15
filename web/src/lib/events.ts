@@ -1,5 +1,5 @@
 import type { HubEvent, Part } from '../../../shared/types.ts';
-import { loadState, select, storeSession, upsertMessage } from './actions.ts';
+import { loadState, select, storeAgentOptions, storeSession, upsertMessage } from './actions.ts';
 import { fixtureMode } from './api.ts';
 import { getState, remove, setState, updateThread, upsert } from './store.ts';
 
@@ -40,6 +40,8 @@ export function applyEvent(event: HubEvent) {
       return updateThread(event.run.conversationId, (t) => ({ ...t, runs: { ...t.runs, [event.run.id]: event.run } }));
     case 'session.upsert':
       return storeSession(event.session);
+    case 'agent.options':
+      return storeAgentOptions(event.options);
     case 'routine.upsert':
       return upsert('routines', event.routine);
     case 'routine.removed':

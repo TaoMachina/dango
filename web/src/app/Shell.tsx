@@ -40,6 +40,9 @@ export function Shell() {
   const id = ui.selected[ui.module];
   const conversation = id && !(ui.module === 'code' && ui.newThreadProjectId) ? conversations[id] : undefined;
   const closeDrawer = () => updateUI({ drawer: null });
+  // Code threads show diffs in the panel, so it is wider. At the 1280px panel breakpoint
+  // 1280 - 60 rail - 300 list - 400 panel still leaves 520px for the thread.
+  const panelWidth = conversation?.kind === 'code' ? 'w-[400px]' : 'w-[320px]';
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -71,14 +74,14 @@ export function Shell() {
       {conversation &&
         (widePanel ? (
           ui.panelOpen && (
-            <aside className="h-full w-[320px] shrink-0 overflow-y-auto border-l border-line">
+            <aside className={`h-full ${panelWidth} shrink-0 overflow-y-auto border-l border-line`}>
               <RightPanel conversation={conversation} />
             </aside>
           )
         ) : (
           ui.drawer === 'panel' && (
             <Drawer side="right" label="Details" onClose={closeDrawer}>
-              <div className="h-full w-[320px] max-w-[88vw] overflow-y-auto">
+              <div className={`h-full ${panelWidth} max-w-[88vw] overflow-y-auto`}>
                 <RightPanel conversation={conversation} />
               </div>
             </Drawer>

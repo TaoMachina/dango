@@ -54,7 +54,7 @@ test('the session endpoint answers before the agent is ready, then from the last
 });
 
 test('an option chosen before the session is ready is applied before the first prompt', async () => {
-  const thread = await t.api<Conversation>('POST', '/api/conversations', { kind: 'code', projectId: project.id, agentId: one.id });
+  const thread = await t.api<Conversation>('POST', '/api/conversations', { kind: 'code', projectId: project.id, agentId: one.id, title: 'Settings' });
   const opening = await open(thread.id);
   assert.equal(opening.ready, false);
   // Code threads show model, effort and mode first, then the rest.
@@ -66,6 +66,22 @@ test('an option chosen before the session is ready is applied before the first p
   await t.api('POST', `/api/conversations/${thread.id}/messages`, { text: 'settings' });
   // The code thread keeps the agent's own fast mode.
   assert.match(textOf(await finishedReply(t, thread.id, one.id)), /model=large fast=true$/);
+});
+
+test('a new task picks its model up front and, without a project, gets its own folder', async () => {
+  const offered = await t.api<{ options: SessionInfo['options']; ready: boolean }>('POST', `/api/agents/${one.id}/options`);
+  assert.equal(offered.ready, true);
+  assert.deepEqual(ids(offered as SessionInfo), ['model', 'effort', 'mode', 'fast']);
+  const body = { kind: 'code', projectId: null, agentId: one.id, title: 'Fix the login page!', options: [{ optionId: 'model', value: 'large' }] };
+  const thread = await t.api<Conversation>('POST', '/api/conversations', body);
+  const state = await t.api<StateResponse>('GET', '/api/state');
+  assert.equal(state.projects.find(p => p.id === thread.projectId)!.path, join(t.hub.paths.dir, 'Agentry', 'projects', 'fix-the-login-page'));
+  // The same title again gets the next free folder name.
+  const again = await t.api<Conversation>('POST', '/api/conversations', { ...body, options: [] });
+  assert.ok((await t.api<StateResponse>('GET', '/api/state')).projects.find(p => p.id === again.projectId)!.path.endsWith('fix-the-login-page-2'));
+  assert.equal((await t.raw('POST', '/api/conversations', { cookie: t.cookie }, { ...body, options: [{ optionId: 'model', value: 'nope' }] })).status, 400);
+  await t.api('POST', `/api/conversations/${thread.id}/messages`, { text: 'settings' });
+  assert.match(textOf(await finishedReply(t, thread.id, one.id)), /model=large/);
 });
 
 test('a chat turns fast mode off and refuses hidden options', async () => {

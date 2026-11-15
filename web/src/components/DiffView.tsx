@@ -9,14 +9,16 @@ const ROW = {
 
 const SIGN = { same: ' ', add: '+', del: '-' };
 
-export function DiffView({ path, oldText, newText }: { path: string; oldText: string | null; newText: string }) {
+export function DiffView({ path, oldText, newText, showPath = true }: { path: string; oldText: string | null; newText: string; showPath?: boolean }) {
   const rows = useMemo(() => unifiedDiff(oldText, newText), [oldText, newText]);
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-bg">
-      <div className="truncate border-b border-line px-3 py-1.5 font-mono text-[12px] text-muted" title={path}>
-        {path}
-        {oldText === null && <span className="ml-2 text-add">new file</span>}
-      </div>
+      {showPath && (
+        <div className="truncate border-b border-line px-3 py-1.5 font-mono text-[12px] text-muted" title={path}>
+          {path}
+          {oldText === null && <span className="ml-2 text-add">new file</span>}
+        </div>
+      )}
       <pre className="max-h-96 overflow-auto py-1 font-mono text-[12px] leading-5">
         {rows.map((row, index) =>
           row.kind === 'gap' ? (

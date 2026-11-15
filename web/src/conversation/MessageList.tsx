@@ -3,6 +3,7 @@ import type { Conversation, Message } from '../../../shared/types.ts';
 import { Button, Spinner } from '../components/ui.tsx';
 import { loadEarlier, openThread } from '../lib/actions.ts';
 import { useStore } from '../lib/store.ts';
+import { CodeTimeline } from '../code/CodeTimeline.tsx';
 import { MessageItem } from './MessageItem.tsx';
 
 // Within this distance of the bottom (about three lines of text) the list follows new output.
@@ -15,6 +16,7 @@ function agentOf(message: Message) {
 export function MessageList({ conversation }: { conversation: Conversation }) {
   const thread = useStore((s) => s.threads[conversation.id]);
   const agents = useStore((s) => s.agents);
+  const project = useStore((s) => (conversation.projectId ? s.projects[conversation.projectId] : undefined));
   const ref = useRef<HTMLDivElement>(null);
   const following = useRef(true);
   const prependFrom = useRef<number | null>(null);
@@ -72,23 +74,32 @@ export function MessageList({ conversation }: { conversation: Conversation }) {
           </Button>
         )}
         {messages.length === 0 && <p className="mt-16 text-center text-[14px] text-muted">No messages yet</p>}
-        {messages.map((message, index) => {
-          const agentId = agentOf(message);
-          const prev = messages[index - 1];
-          const run = message.runId ? thread.runs[message.runId] : undefined;
-          const parent = run?.parentRunId ? thread.runs[run.parentRunId] : undefined;
-          const showHeader = group && agentId !== null && (!prev || agentOf(prev) !== agentId);
-          return (
-            <MessageItem
-              key={message.id}
-              message={message}
-              agent={agentId ? agents[agentId] : undefined}
-              showHeader={showHeader}
-              triggeredBy={parent ? (agents[parent.agentId]?.name ?? null) : null}
-              run={run}
-            />
-          );
-        })}
+        {conversation.kind === 'code' ? (
+          // Code threads read as a work log (T3 Code), not as chat bubbles.
+          <CodeTimeline
+            messages={messages}
+            runs={thread.runs}
+            context={{ catalogId: agents[conversation.memberIds[0]]?.catalogId ?? null, root: project?.path }}
+          />
+        ) : (
+          messages.map((message, index) => {
+            const agentId = agentOf(message);
+            const prev = messages[index - 1];
+            const run = message.runId ? thread.runs[message.runId] : undefined;
+            const parent = run?.parentRunId ? thread.runs[run.parentRunId] : undefined;
+            const showHeader = group && agentId !== null && (!prev || agentOf(prev) !== agentId);
+            return (
+              <MessageItem
+                key={message.id}
+                message={message}
+                agent={agentId ? agents[agentId] : undefined}
+                showHeader={showHeader}
+                triggeredBy={parent ? (agents[parent.agentId]?.name ?? null) : null}
+                run={run}
+              />
+            );
+          })
+        )}
       </div>
     </div>
   );

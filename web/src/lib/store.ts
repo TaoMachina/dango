@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type {
+  AgentOptions,
   Agent,
   Conversation,
   Environment,
@@ -43,6 +44,7 @@ export interface State {
   routines: Record<ID, Routine>;
   threads: Record<ID, Thread>;
   sessions: Record<string, SessionInfo>;
+  agentOptions: Record<ID, AgentOptions>; // what a new Code thread can pick per agent
   toasts: Toast[];
   ui: UI;
 }
@@ -59,6 +61,7 @@ let state: State = {
   routines: {},
   threads: {},
   sessions: {},
+  agentOptions: {},
   toasts: [],
   ui: {
     module: startModule,

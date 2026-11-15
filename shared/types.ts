@@ -182,6 +182,13 @@ export interface SessionInfo {
   ready: boolean; // false while the agent process or session is still starting; options then come from the agent's last session
 }
 
+// What a new Code thread can choose for an agent: its model, effort, mode and other options from its last session.
+export interface AgentOptions {
+  agentId: ID;
+  options: SessionOption[];
+  ready: boolean; // false until the agent has run once and reported its options
+}
+
 // ---------- Routines ----------
 
 export type Schedule =
@@ -224,6 +231,7 @@ export interface StateResponse {
 // POST   /api/permissions/:requestId                  { optionId } | { cancel: true } -> {}
 // PATCH  /api/agents/:id                              { name?, avatar?, description?, hidden? } -> Agent
 // POST   /api/agents/rescan                           -> { agents: Agent[] }
+// POST   /api/agents/:id/options                      -> AgentOptions (for a new Code thread; starts an agent never run before and sends agent.options when known)
 // POST   /api/agents/external                         -> { instruction: string } (the agent appears when it first calls the hub)
 // POST   /api/agents/:id/instruction                  -> { instruction: string } (external agents; issues a new token)
 // POST   /api/agents/url                              { baseUrl, apiKey?, model?, name?, sessionHeader? } -> { agent: Agent }
@@ -246,7 +254,9 @@ export interface StateResponse {
 
 export type CreateConversationRequest =
   | { kind: 'group'; title: string; memberIds: ID[]; leadId?: ID }
-  | { kind: 'code'; projectId: ID; agentId: ID; title?: string };
+  // projectId null: the hub makes a new folder for the thread under ~/Agentry/projects, named from the title.
+  // options: the model, effort and mode picked before the thread exists, applied before its first prompt.
+  | { kind: 'code'; projectId: ID | null; agentId: ID; title: string; options?: { optionId: string; value: string | boolean }[] };
 
 
 export interface ApiError { error: string }
@@ -266,5 +276,6 @@ export type HubEvent =
   | { type: 'message.part'; conversationId: ID; messageId: ID; partIndex: number; part: Part } // set or add a part
   | { type: 'run.upsert'; run: Run }
   | { type: 'session.upsert'; session: SessionInfo }
+  | { type: 'agent.options'; options: AgentOptions }
   | { type: 'routine.upsert'; routine: Routine }
   | { type: 'routine.removed'; routineId: ID };

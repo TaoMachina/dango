@@ -1,7 +1,7 @@
 // Drives ACP agents: one process per agent, one ACP session per (agent, conversation).
 import { mkdirSync } from 'node:fs';
 import * as acp from '@agentclientprotocol/sdk';
-import type { Agent, AgentStatus, Conversation, ConversationKind, ID, SessionInfo } from '../../shared/types.ts';
+import type { Agent, AgentOptions, AgentStatus, Conversation, ConversationKind, ID, SessionInfo } from '../../shared/types.ts';
 import type { CatalogEntry } from '../agents/catalog.ts';
 import type { Events } from '../events.ts';
 import type { ToolTokens } from '../mcp/tools.ts';
@@ -256,6 +256,8 @@ export class AcpHost implements Executor {
   // Keeps the agent's last settings so the next session shows them at once, and tells clients once the session is ready.
   private changed(session: Session) {
     this.o.store.saveSessionCache(session.agentId, session.state);
+    const agent = this.o.store.getAgent(session.agentId);
+    if (agent) this.o.events.emit({ type: 'agent.options', options: this.draftOptions(agent) });
     if (!session.ready) return;
     this.o.events.emit({ type: 'session.upsert', session: sessionInfo({ id: session.conversationId, kind: session.kind }, session.agentId, session.state, true) });
   }
@@ -327,6 +329,18 @@ export class AcpHost implements Executor {
   }
 
   // Answers at once: the live session when it is ready, otherwise the agent's last settings while the session starts.
+  // Choices for a Code thread that does not exist yet: the agent's last session settings, seen as Code sees them.
+  // An agent that never ran starts in its own chat, so the picker fills in once it reports its options.
+  draftOptions(agent: Agent): AgentOptions {
+    const cache = this.o.store.getSessionCache(agent.id);
+    if (!cache) {
+      const chat = this.o.store.getConversation(agent.chatId);
+      if (chat) this.ensureSession(agent, chat).catch(() => {}); // openSession reports failures on the agent's status.
+    }
+    const state = cache ? { ...cache, usage: null } : stateFrom({});
+    return { agentId: agent.id, options: sessionInfo({ id: '', kind: 'code' }, agent.id, state, false).options, ready: cache !== null };
+  }
+
   info(agent: Agent, conversation: Conversation): SessionInfo {
     const live = this.readySessions.get(`${agent.id}:${conversation.id}`);
     if (live) return sessionInfo(conversation, agent.id, live.state, true);

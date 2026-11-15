@@ -120,6 +120,16 @@ const OLD_COMPOSER = `export function Composer() {
   );
 }`;
 
+const OLD_CHANGELOG = `## 0.2
+
+- Routines and external agents. [0.2](https://example.com/releases/tag/v0.1)
+- See the [notes](https://example.com/releases/tag/v0.1.0).`;
+
+const NEW_CHANGELOG = `## 0.2
+
+- Routines and external agents. [0.2](https://example.com/releases/tag/v0.2)
+- See the [notes](https://example.com/releases/tag/v0.2.0).`;
+
 const NEW_COMPOSER = `export function Composer() {
   const [text, setText] = useState('');
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -187,7 +197,23 @@ Details are in [the architecture notes](https://agentclientprotocol.com).`),
   message('g-launch', by('claude'), [text('@Codex can you check the changelog links?')], 38, { runId: 'run-1', mentions: ['codex'] }),
   message('g-launch', by('codex'), [text('Checked. Two links were stale; both now point at the 0.2 tag.')], 36, { runId: 'run-2' }),
   message('t-links', user, [text('Two changelog links point at old tags. Fix them.')], 90),
-  message('t-links', by('codex'), [text('Both links now point at the 0.2 tag. No other stale links found.')], 88),
+  message(
+    't-links',
+    by('codex'),
+    [
+      { type: 'thought', text: 'Find every changelog link first, then check each tag. A subagent can scan the docs folder while I fix the two known links.' },
+      { type: 'tool', toolCallId: 'tc-l-grep', title: 'rg "releases/tag" CHANGELOG.md docs', kind: 'execute', status: 'completed', locations: [], content: [{ type: 'text', text: 'CHANGELOG.md:12: [0.2](https://example.com/releases/tag/v0.1)\nCHANGELOG.md:30: [notes](https://example.com/releases/tag/v0.1.0)' }] },
+      { type: 'tool', toolCallId: 'tc-l-sub-start', title: 'Start subagent scan_docs', kind: 'other', status: 'completed', locations: [], content: [] },
+      { type: 'thought', text: 'While scan_docs runs, fix the two links in CHANGELOG.md.' },
+      { type: 'tool', toolCallId: 'tc-l-read', title: 'Read CHANGELOG.md', kind: 'read', status: 'completed', locations: ['D:\\projects\\site\\CHANGELOG.md'], content: [] },
+      { type: 'tool', toolCallId: 'tc-l-edit', title: 'Edit CHANGELOG.md', kind: 'edit', status: 'completed', locations: ['D:\\projects\\site\\CHANGELOG.md'], content: [{ type: 'diff', path: 'D:\\projects\\site\\CHANGELOG.md', oldText: OLD_CHANGELOG, newText: NEW_CHANGELOG }] },
+      { type: 'tool', toolCallId: 'tc-l-wait', title: 'wait', kind: 'other', status: 'completed', locations: [], content: [] },
+      { type: 'tool', toolCallId: 'tc-l-sub-done', title: 'Complete subagent scan_docs', kind: 'other', status: 'completed', locations: [], content: [{ type: 'text', text: 'No other stale links in docs/.' }] },
+      { type: 'tool', toolCallId: 'tc-l-test', title: 'npm run check-links', kind: 'execute', status: 'completed', locations: [], content: [{ type: 'text', text: '38 links checked, 0 broken' }] },
+      text('Both links now point at the **0.2** tag. The `scan_docs` subagent found no other stale links, and `npm run check-links` passes.'),
+    ],
+    88,
+  ),
   message('t-composer', user, [text('The composer should grow with the text. Fix it.')], 4),
   message(
     't-composer',
@@ -195,6 +221,18 @@ Details are in [the architecture notes](https://agentclientprotocol.com).`),
     [
       { type: 'thought', text: 'The textarea has rows={1} and never resizes. Setting height from scrollHeight on each change is enough; cap it so the conversation stays visible.' },
       { type: 'tool', toolCallId: 'tc-read', title: 'Read web/src/Composer.tsx', kind: 'read', status: 'completed', locations: ['web/src/Composer.tsx'], content: [{ type: 'text', text: OLD_COMPOSER }] },
+      { type: 'tool', toolCallId: 'tc-search', title: 'Search "rows={1}" in web/src', kind: 'search', status: 'completed', locations: [], content: [{ type: 'text', text: 'web/src/Composer.tsx:4\nweb/src/NoteEditor.tsx:9' }] },
+      { type: 'tool', toolCallId: 'tc-read-2', title: 'Read web/src/NoteEditor.tsx', kind: 'read', status: 'completed', locations: ['web/src/NoteEditor.tsx'], content: [] },
+      { type: 'tool', toolCallId: 'tc-git', title: 'git status --short', kind: 'execute', status: 'completed', locations: [], content: [{ type: 'text', text: ' M web/src/NoteEditor.tsx' }] },
+      {
+        type: 'tool',
+        toolCallId: 'tc-task',
+        title: 'Check other textareas for the same issue',
+        kind: 'think',
+        status: 'completed',
+        locations: [],
+        content: [{ type: 'text', text: 'NoteEditor.tsx has the same fixed one-row textarea. No other textareas found.' }],
+      },
       {
         type: 'plan',
         entries: [

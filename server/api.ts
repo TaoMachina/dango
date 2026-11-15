@@ -10,7 +10,7 @@ import type { External } from './external.ts';
 import { connectSchema, type UrlAgents } from './url-agent.ts';
 import { parse, Router } from './http.ts';
 import { pickFolder } from './folder-picker.ts';
-import { addFolder, createNamed, HttpError } from './projects.ts';
+import { addFolder, createNamed, HttpError, newTaskFolder } from './projects.ts';
 import { scheduleSchema, type Routines } from './routines.ts';
 import { publicRun, type Runs } from './routing.ts';
 import type { Store } from './store.ts';
@@ -102,7 +102,10 @@ export function apiRoutes(d: ApiDeps): Router {
     .on('POST', '/api/conversations', c => {
       const body = parse(z.discriminatedUnion('kind', [
         z.object({ kind: z.literal('group'), title: name, memberIds: z.array(z.string()).min(1), leadId: z.string().optional() }),
-        z.object({ kind: z.literal('code'), projectId: z.string(), agentId: z.string(), title: z.string().optional() }),
+        z.object({
+          kind: z.literal('code'), projectId: z.string().nullable(), agentId: z.string(), title: name,
+          options: z.array(z.object({ optionId: z.string(), value: z.union([z.string(), z.boolean()]) })).optional(),
+        }),
       ]), c.body);
       let created: Conversation;
       if (body.kind === 'group') {
@@ -113,13 +116,21 @@ export function apiRoutes(d: ApiDeps): Router {
           kind: 'group', title: body.title, avatar: defaultAvatar(null, [...store.listAgents().map(a => a.avatar), ...store.listConversations().flatMap(c => (c.avatar ? [c.avatar] : []))]), memberIds, leadId: body.leadId ?? memberIds[0], projectId: null, hopLimit: DEFAULT_HOP_LIMIT,
         });
       } else {
-        const project = store.getProject(body.projectId);
-        if (!project) throw new HttpError(404, 'Project not found.');
+        const worker = agent(body.agentId);
         // A url agent has no access to this computer's folders.
-        if (agent(body.agentId).source === 'url') throw new HttpError(400, 'Agents connected by URL cannot work in a project on this computer.');
+        if (worker.source === 'url') throw new HttpError(400, 'Agents connected by URL cannot work in a project on this computer.');
+        const offered = worker.source === 'acp' ? d.acp.draftOptions(worker).options : [];
+        for (const choice of body.options ?? []) {
+          const option = offered.find(o => o.id === choice.optionId);
+          const valid = option && (option.type === 'boolean' ? typeof choice.value === 'boolean' : option.choices.some(c => c.value === choice.value));
+          if (!valid) throw new HttpError(400, `${JSON.stringify(choice.value)} is not a choice for ${choice.optionId}.`);
+        }
+        const project = body.projectId === null ? newTaskFolder(store, events, d.projectsDir, body.title) : store.getProject(body.projectId);
+        if (!project) throw new HttpError(404, 'Project not found.');
         created = store.insertConversation({
-          kind: 'code', title: body.title?.trim() || project.name, avatar: null, memberIds: [body.agentId], leadId: null, projectId: project.id, hopLimit: 0,
+          kind: 'code', title: body.title, avatar: null, memberIds: [worker.id], leadId: null, projectId: project.id, hopLimit: 0,
         });
+        for (const choice of body.options ?? []) store.saveChoice(worker.id, created.id, choice);
       }
       emitConversation(created);
       return created;
@@ -185,6 +196,11 @@ export function apiRoutes(d: ApiDeps): Router {
     })
 
     .on('POST', '/api/agents/rescan', () => ({ agents: rescan(store, events, d.catalog) }))
+
+    .on('POST', '/api/agents/:id/options', c => {
+      const a = agent(c.params.id);
+      return a.source === 'acp' ? d.acp.draftOptions(a) : { agentId: a.id, options: [], ready: true };
+    })
 
     .on('POST', '/api/agents/external', () => ({ instruction: d.external.invite() }))
 

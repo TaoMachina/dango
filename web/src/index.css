@@ -149,13 +149,20 @@ button:disabled {
   animation: typing 1.2s infinite;
 }
 
-@keyframes flash {
-  from { background: var(--selected); }
-  to { background: transparent; }
+/* Code work log: the line the agent is working on now, after T3 Code's live-tool shine.
+   Same period as the typing dots. */
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
 }
 
-.animate-flash {
-  animation: flash 1.2s ease-out;
+.shimmer {
+  background: linear-gradient(90deg, var(--muted) 30%, var(--fg) 50%, var(--muted) 70%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.2s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

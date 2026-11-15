@@ -48,6 +48,18 @@ export function createNamed(store: Store, events: Events, dir: string, name: str
   return register(store, events, full, trimmed);
 }
 
+// A Code thread started without a project gets its own new folder, named from its title.
+export function newTaskFolder(store: Store, events: Events, dir: string, title: string): Project {
+  // A short readable folder name: up to 40 characters keeps paths and the sidebar row tidy, cut at a whole word.
+  // Letters and digits of any script stay, so a Chinese or Japanese title keeps a readable name.
+  const full = title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '');
+  const atWord = full.slice(0, 41).match(/^(.*)-[^-]*$/)?.[1];
+  const slug = (full.length <= 40 ? full : atWord || full.slice(0, 40)) || 'task';
+  let name = slug;
+  for (let n = 2; projectAt(store, join(dir, name)) || existsSync(join(dir, name)); n++) name = `${slug}-${n}`;
+  return createNamed(store, events, dir, name);
+}
+
 // agentry_start_code_task: an absolute path becomes a project, creating the folder when missing.
 export function folderProject(store: Store, events: Events, path: string): Project {
   const full = absolute(path);
