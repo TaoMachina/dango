@@ -33,7 +33,9 @@ test('a chat message runs the agent, streams the reply and finishes', async () =
   const run = await waitFor(() => t.events.findLast(e => e.type === 'run.upsert' && e.run.id === reply.runId && e.run.status === 'done'), 'run done');
   assert.ok(run);
   const page = await t.api<{ messages: Message[] }>('GET', `/api/conversations/${one.chatId}/messages`);
-  assert.equal(textOf(page.messages.at(-1)!), 'One heard: hi tool');
+  assert.equal(textOf(page.messages.findLast(m => m.author.type === 'agent')!), 'One heard: hi tool');
+  // The diff edited a file outside the chat folder, so the person is told which file changed.
+  assert.match(textOf(page.messages.at(-1)!), /^One changed a\.txt/);
 });
 
 test('session options come from the agent and can be changed', async () => {

@@ -1,7 +1,7 @@
 import { Fragment, useState, type ReactNode } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { toast, type Module } from '../lib/store.ts';
-import { select } from '../lib/actions.ts';
+import { openNewThread, select } from '../lib/actions.ts';
 
 // A small Markdown renderer. Input text only ever becomes React text nodes, so raw HTML is escaped.
 
@@ -137,15 +137,15 @@ const INLINE =
   /(`+)([\s\S]*?[^`])\1(?!`)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|\*(?!\s)([\s\S]*?[^\s])\*|_(?!\s)([\s\S]*?[^\s])_(?![\p{L}\p{N}])|~~([\s\S]+?)~~|\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/u;
 
 function safeHref(url: string) {
-  return /^(https?:|mailto:|\?m=(chat|code)&c=)/i.test(url) ? url : null;
+  return /^(https?:|mailto:|\?m=(chat|code)&[cp]=)/i.test(url) ? url : null;
 }
 
-// The hub links Agentry conversations as `?m=<module>&c=<id>`; open those in place.
+// The hub links conversations as `?m=<module>&c=<id>` and projects as `?m=code&p=<id>`; open those in place.
 function link(href: string, children: ReactNode, key: number) {
   if (href.startsWith('?')) {
     const params = new URLSearchParams(href);
     return (
-      <a key={key} href={href} onClick={e => { e.preventDefault(); select(params.get('m') as Module, params.get('c')); }} className="underline decoration-faint underline-offset-2 hover:decoration-fg">
+      <a key={key} href={href} onClick={e => { e.preventDefault(); const project = params.get('p'); if (project) openNewThread(project); else select(params.get('m') as Module, params.get('c')); }} className="underline decoration-faint underline-offset-2 hover:decoration-fg">
         {children}
       </a>
     );

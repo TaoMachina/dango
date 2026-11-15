@@ -1,5 +1,8 @@
 import type { Agent, Conversation, ID, Message, MessageAuthor, Part, PermissionOption, Run } from '../shared/types.ts';
 import type { Events } from './events.ts';
+import { editedPaths, fileList, isInside, projectFolder } from './chat-edits.ts';
+import { folderProject } from './projects.ts';
+import { existsSync } from 'node:fs';
 import { messageText, newId, now, publicMessage, type Store, type StoredMessage } from './store.ts';
 
 export type RunOutcome = { status: 'done' | 'stopped'; note?: string };
@@ -178,6 +181,8 @@ export class LiveRun {
     this.runs.emitConversation(this.conversation.id);
     this.runs.emitAgent(this.agent.id);
     this.runs.reportToRequester(this.conversation, this.agent, status);
+    // Files edited from a chat or group belong to a project too; whatever the run's outcome, the edits happened.
+    if (message && this.conversation.kind !== 'code') this.runs.noteChatEdits(this.conversation, this.agent, message.parts);
     const conversation = store.getConversation(this.conversation.id);
     if (status !== 'done' || !message || !conversation || conversation.kind !== 'group') return;
     const withinLimit = this.run.depth + 1 <= conversation.hopLimit;
@@ -211,9 +216,31 @@ export class Runs {
   // Runs for the same agent session run one after another: ACP allows one prompt per session at a time.
   private queues = new Map<string, Promise<void>>();
 
-  constructor(store: Store, events: Events) {
+  home: string;
+  scratchDirs: string[]; // chat working folders whose edits are not project work
+
+  constructor(store: Store, events: Events, home: string, scratchDirs: string[]) {
     this.store = store;
     this.events = events;
+    this.home = home;
+    this.scratchDirs = scratchDirs;
+  }
+
+  // Adds the folder an agent edited from a chat to Code (when new) and tells the person which files changed.
+  noteChatEdits(conversation: Conversation, agent: Agent, parts: Part[]) {
+    const paths = editedPaths(parts, this.scratchDirs);
+    if (paths.length === 0) return;
+    const files = fileList(paths);
+    const folder = projectFolder(paths, this.home);
+    // Only a folder that exists becomes a project (an agent may report a path it then removed).
+    if (!folder || !existsSync(folder)) {
+      this.postMessage(conversation.id, { type: 'system' }, `${agent.name} changed ${files}.`);
+      return;
+    }
+    const existing = this.store.listProjects().find(p => isInside(folder, p.path));
+    const project = existing ?? folderProject(this.store, this.events, folder);
+    const added = existing ? '' : ' Added to Code.';
+    this.postMessage(conversation.id, { type: 'system' }, `${agent.name} changed ${files} in [${project.name}](?m=code&p=${project.id}).${added}`);
   }
 
   executorFor(agent: Agent): Executor {

@@ -1,4 +1,5 @@
 // Builds and starts one hub: storage, agents, routing, routines and the HTTP server.
+import { homedir } from 'node:os';
 import { mkdirSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
@@ -54,7 +55,9 @@ export async function createHub(options: HubOptions) {
   let port = options.port;
   const hubUrl = () => `http://127.0.0.1:${port}`;
   const events = new Events();
-  const runs = new Runs(store, events);
+  const home = options.userHome ?? homedir();
+  // Edits in the chat folder or Agentry's own data are scratch work, not a project.
+  const runs = new Runs(store, events, home, [defaultWorkDir(home), paths.dir]);
   const tokens = new ToolTokens();
   const routines = new Routines(store, events, runs);
   const tools = new Tools(store, events, runs, routines);

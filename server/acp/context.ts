@@ -24,7 +24,11 @@ function roleLines(conversation: Conversation, agent: Agent, members: Agent[]): 
 const tools =
   'With the agentry tools you can start coding work in a project with agentry_start_code_task (an existing project by name, or a folder path), ' +
   'see projects and their Code threads with agentry_list_projects, check a Code thread\'s progress and result with agentry_read_code_thread, ' +
-  'and schedule work with agentry_create_routine. Do larger file edits through a Code thread rather than in a conversation.';
+  'and schedule work with agentry_create_routine.\n' +
+  'Coding work belongs in Code, where the person follows projects, files and changes: when the person asks you to create or change ' +
+  'a project, an app or files, call agentry_start_code_task (an existing project, or the folder path for a new one) instead of editing ' +
+  'files here, then tell the person in one line that the work continues in Code (Agentry posts the link, so leave out ids). ' +
+  'Answering questions and reading files is fine here.';
 
 // `project` is the code thread's project and null for chats and groups.
 export function sessionContext(conversation: Conversation, agent: Agent, members: Agent[], project: Project | null): string {
