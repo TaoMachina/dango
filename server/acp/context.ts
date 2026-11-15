@@ -28,15 +28,24 @@ const tools =
 
 // `project` is the code thread's project and null for chats and groups.
 export function sessionContext(conversation: Conversation, agent: Agent, members: Agent[], project: Project | null): string {
+  return contextLines(conversation, agent, members, project, tools);
+}
+
+// For agents the hub calls over an OpenAI-compatible API: they have no agentry tools, so the context leaves them out.
+export function apiContext(conversation: Conversation, agent: Agent, members: Agent[], project: Project | null): string {
+  return contextLines(conversation, agent, members, project, null);
+}
+
+function contextLines(conversation: Conversation, agent: Agent, members: Agent[], project: Project | null, toolText: string | null): string {
   const lines = [`You are ${agent.name} in Agentry, an app where the person on this computer talks with their agents.`];
   if (conversation.kind === 'chat') {
-    lines.push(`This is your own chat with the person. ${tools}`);
+    lines.push(toolText ? `This is your own chat with the person. ${toolText}` : 'This is your own chat with the person.');
   } else if (conversation.kind === 'group') {
     lines.push(
       `This is the group "${conversation.title}". Members: ${members.map(describe).join(', ')}.`,
       ...roleLines(conversation, agent, members),
       `Agent-to-agent handoffs stop after ${conversation.hopLimit} in a row. Group messages reach you as [Author]: text, and your reply is posted to the group.`,
-      tools,
+      ...(toolText ? [toolText] : []),
     );
   } else {
     lines.push(`You are working in project ${project!.name} at ${project!.path}.`);

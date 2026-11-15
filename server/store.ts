@@ -5,6 +5,9 @@ import type {
 } from '../shared/types.ts';
 import type { Choice, SessionState } from './acp/mapping.ts';
 
+// Where the hub calls a 'url' agent. baseUrl has no trailing '/v1' or slash.
+export interface UrlAgentConfig { baseUrl: string; apiKey: string | null; model: string | null; sessionHeader: string | null }
+
 export const newId = () => randomUUID();
 export const now = () => new Date().toISOString();
 
@@ -26,10 +29,11 @@ export class Store {
 
   private agentFrom(r: Row): Agent {
     const working = r.status === 'ready' && this.count(`SELECT COUNT(*) AS n FROM runs WHERE agent_id = ? AND status = 'running'`, r.id) > 0;
+    const apiHost = r.source === 'url' ? new URL(this.getUrlAgent(r.id)!.baseUrl).host : null;
     return {
       id: r.id, name: r.name, avatar: JSON.parse(r.avatar), description: r.description, source: r.source,
       catalogId: r.catalog_id, runtimeLabel: r.runtime_label, environmentId: r.environment_id,
-      status: working ? 'working' : r.status, statusDetail: r.status_detail, hidden: !!r.hidden, chatId: r.chat_id,
+      status: working ? 'working' : r.status, statusDetail: r.status_detail, apiHost, hidden: !!r.hidden, chatId: r.chat_id,
       createdAt: r.created_at,
     };
   }
@@ -43,12 +47,11 @@ export class Store {
     return r ? this.agentFrom(r) : null;
   }
 
-  insertAgent(a: Omit<Agent, 'createdAt'>): Agent {
+  insertAgent(a: Omit<Agent, 'createdAt' | 'apiHost'>) {
     this.db.prepare(`INSERT INTO agents (id, name, avatar, description, source, catalog_id, runtime_label, environment_id, status, status_detail, hidden, chat_id, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       a.id, a.name, JSON.stringify(a.avatar), a.description, a.source, a.catalogId, a.runtimeLabel, a.environmentId,
       a.status, a.statusDetail, a.hidden ? 1 : 0, a.chatId, now());
-    return this.getAgent(a.id)!;
   }
 
   updateAgent(id: ID, patch: Partial<Pick<Agent, 'name' | 'avatar' | 'description' | 'hidden' | 'status' | 'statusDetail' | 'runtimeLabel'>>): Agent {
@@ -62,6 +65,16 @@ export class Store {
 
   deleteAgent(id: ID) {
     this.db.prepare('DELETE FROM agents WHERE id = ?').run(id);
+  }
+
+  saveUrlAgent(agentId: ID, c: UrlAgentConfig) {
+    this.db.prepare('INSERT INTO url_agents (agent_id, base_url, api_key, model, session_header) VALUES (?, ?, ?, ?, ?)')
+      .run(agentId, c.baseUrl, c.apiKey, c.model, c.sessionHeader);
+  }
+
+  getUrlAgent(agentId: ID): UrlAgentConfig | null {
+    const r = this.db.prepare('SELECT * FROM url_agents WHERE agent_id = ?').get(agentId) as Row | undefined;
+    return r ? { baseUrl: r.base_url, apiKey: r.api_key, model: r.model, sessionHeader: r.session_header } : null;
   }
 
   // ---------- conversations ----------

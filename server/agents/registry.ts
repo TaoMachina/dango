@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import type { Agent, Avatar } from '../../shared/types.ts';
 import type { Events } from '../events.ts';
-import { newId, publicMessage, type Store } from '../store.ts';
+import { newId, publicMessage, type Store, type UrlAgentConfig } from '../store.ts';
 import { isInstalled, type CatalogEntry } from './catalog.ts';
 
 // Blob avatar colors, the same set the web avatar picker offers (web/src/components/Avatar.tsx).
@@ -26,13 +26,14 @@ export function defaultAvatar(catalogId: string | null, used: Avatar[]): Avatar 
   return { kind: 'blob', color: colors[randomInt(colors.length)], shape: randomInt(SHAPES), face: randomInt(FACES) };
 }
 
-// Every agent gets one persistent chat, created with it.
-export function createAgentWithChat(store: Store, events: Events, fields: Pick<Agent, 'name' | 'source' | 'catalogId' | 'runtimeLabel' | 'status'>): Agent {
+// Every agent gets one persistent chat, created with it. A 'url' agent also stores where the hub calls it.
+export function createAgentWithChat(store: Store, events: Events, fields: Pick<Agent, 'name' | 'source' | 'catalogId' | 'runtimeLabel' | 'status'>, url?: UrlAgentConfig): Agent {
   const id = newId();
   const chat = store.insertConversation({ kind: 'chat', title: fields.name, avatar: null, memberIds: [], leadId: null, projectId: null, hopLimit: 0 });
   store.insertAgent({
     ...fields, id, avatar: defaultAvatar(fields.catalogId, store.listAgents().map(a => a.avatar)), description: '', environmentId: 'local', statusDetail: null, hidden: false, chatId: chat.id,
   });
+  if (url) store.saveUrlAgent(id, url);
   store.setMembers(chat.id, [id]);
   const agent = store.getAgent(id)!;
   events.emit({ type: 'agent.upsert', agent });

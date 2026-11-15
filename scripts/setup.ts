@@ -1,7 +1,7 @@
 // Builds the web app and adds an Agentry icon to the desktop and app menu, then opens Agentry.
 // Usage (after `npm install`): npm run setup
 import { execFileSync, spawnSync } from 'node:child_process';
-import { writeFileSync, mkdirSync, copyFileSync, chmodSync, symlinkSync, existsSync, rmSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, copyFileSync, chmodSync, symlinkSync, existsSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +19,32 @@ if (major < 24) throw new Error(`Agentry needs Node.js 24 or later. This is ${pr
 console.log('Building the web app…');
 await build({ configFile: join(root, 'vite.config.ts'), logLevel: 'warn' });
 mkdirSync(paths.dir, { recursive: true });
+
+// After an update the running hub still has the old code, so stop it; the launcher below starts the new one.
+if (existsSync(paths.hubJson)) {
+  const { pid, port } = JSON.parse(readFileSync(paths.hubJson, 'utf8')) as { pid: number; port: number };
+  // A killed hub leaves hub.json behind and its PID may be reused, so only stop a PID whose hub still answers.
+  const answering = await fetch(`http://127.0.0.1:${port}/api/health`).then(r => r.ok, () => false);
+  if (answering && isAlive(pid)) {
+    console.log('Stopping the running Agentry…');
+    // The hub stops its agents on SIGTERM; Windows has no signals, so end the process tree there.
+    if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    else process.kill(pid, 'SIGTERM');
+    // Check every 100 ms: a hub exits within a second, and this keeps the wait short without busy-looping.
+    while (isAlive(pid)) await new Promise(r => setTimeout(r, 100));
+  }
+}
+
+function isAlive(pid: number): boolean {
+  // Signal 0 only checks that the process exists; ESRCH means it is gone.
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false;
+    throw error;
+  }
+}
 
 if (process.platform === 'win32') {
   // wscript runs the launcher without a console window.

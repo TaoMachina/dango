@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+﻿import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { MemberModelPicker } from '../conversation/SessionPickers.tsx';
 import { Crown, FileDiff, Minus, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import type { Avatar as AvatarData, Conversation, ID } from '../../../shared/types.ts';
@@ -6,7 +6,7 @@ import { Avatar } from '../components/Avatar.tsx';
 import { EditableText } from '../components/EditableText.tsx';
 import { Popover, usePopover } from '../components/Popover.tsx';
 import { Button, IconButton, MenuItem, SectionTitle, Switch } from '../components/ui.tsx';
-import { deleteConversation, openSession, patchAgent, patchConversation } from '../lib/actions.ts';
+import { deleteConversation, openSession, patchAgent, patchConversation, removeAgent } from '../lib/actions.ts';
 import { conversationAvatar, primaryAgent, STATUS_COLOR, STATUS_LABEL } from '../lib/display.ts';
 import { updateUI, useStore } from '../lib/store.ts';
 import { AvatarPicker } from './AvatarPicker.tsx';
@@ -56,8 +56,10 @@ function AgentPanel({ conversation }: { conversation: Conversation }) {
       >
         <p className="text-[13px] text-muted">
           {agent.runtimeLabel}
-          {environment && ` · ${environment.name}`}
+          {/* A url agent runs at its API host, not on this computer. */}
+          {agent.source !== 'url' && environment && ` 路 ${environment.name}`}
         </p>
+        {agent.apiHost && <p className="break-all text-[13px] text-muted">{agent.apiHost}</p>}
         <p className="flex items-center gap-1.5 text-[13px] text-muted">
           <span className={`size-2 rounded-full ${STATUS_COLOR[agent.status]}`} />
           {STATUS_LABEL[agent.status]}
@@ -85,6 +87,20 @@ function AgentPanel({ conversation }: { conversation: Conversation }) {
       <div className="border-t border-line px-2 py-2">
         <Routines conversation={conversation} />
       </div>
+      {agent.source !== 'acp' && (
+        // Installed agents leave when they are uninstalled; agents that joined by invitation or URL are removed here.
+        <div className="border-t border-line p-3">
+          <Button
+            variant="danger"
+            className="w-full"
+            onClick={() => {
+              if (confirm(`Remove ${agent.name}? Its chat will be removed.`)) void removeAgent(agent);
+            }}
+          >
+            <Trash2 size={15} /> Remove agent
+          </Button>
+        </div>
+      )}
     </>
   );
 }

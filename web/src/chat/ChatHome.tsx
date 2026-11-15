@@ -61,7 +61,7 @@ export function ChatHome() {
             </Button>
             {adding && (
               <Popover anchor={addRef} onClose={() => setAdding(false)} label="Add agent" width={360}>
-                <AddAgentForm />
+                <AddAgentForm onDone={() => setAdding(false)} />
               </Popover>
             )}
           </div>

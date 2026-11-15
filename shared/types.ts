@@ -28,18 +28,22 @@ export type AgentStatus =
   | 'needs-auth' // the agent reported it needs a login
   | 'error'
   | 'offline'; // external agent not polling, or binary missing after rescan
+// 'url' agents are 'ready' after a successful connection test and 'error' (with statusDetail) when a call fails.
 
 export interface Agent {
   id: ID;
   name: string; // person-chosen display name
   avatar: Avatar;
   description: string;
-  source: 'acp' | 'external';
+  // acp: launched on this computer; external: polls the hub with a token;
+  // url: the hub calls its OpenAI-compatible API (for agents hosted elsewhere).
+  source: 'acp' | 'external' | 'url';
   catalogId: string | null; // built-in catalog entry, e.g. 'claude-code', 'codex', 'antigravity'
   runtimeLabel: string; // product name, e.g. 'Claude Code'
   environmentId: ID;
   status: AgentStatus;
   statusDetail: string | null; // human-readable reason for needs-auth / error
+  apiHost: string | null; // url agents: the host of their API (never the key); null for others
   hidden: boolean;
   chatId: ID; // the agent's own persistent chat
   createdAt: ISODate;
@@ -222,7 +226,10 @@ export interface StateResponse {
 // POST   /api/agents/rescan                           -> { agents: Agent[] }
 // POST   /api/agents/external                         -> { instruction: string } (the agent appears when it first calls the hub)
 // POST   /api/agents/:id/instruction                  -> { instruction: string } (external agents; issues a new token)
-// DELETE /api/agents/:id                              -> {} (external agents only)
+// POST   /api/agents/url                              { baseUrl, apiKey?, model?, name?, sessionHeader? } -> { agent: Agent }
+//                                                     tests GET {baseUrl}/v1/models first; baseUrl may end in /v1 or not
+//                                                     the key stays in the hub database and is never sent to the browser
+// DELETE /api/agents/:id                              -> {} (external and url agents only)
 // POST   /api/projects                                { path } | { name } -> Project
 //                                                     path: an existing folder (from /api/fs/pick-folder)
 //                                                     name: creates ~/Agentry/projects/<name>

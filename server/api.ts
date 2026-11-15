@@ -7,6 +7,7 @@ import type { CatalogEntry } from './agents/catalog.ts';
 import { defaultAvatar, rescan } from './agents/registry.ts';
 import type { Events } from './events.ts';
 import type { External } from './external.ts';
+import { connectSchema, type UrlAgents } from './url-agent.ts';
 import { parse, Router } from './http.ts';
 import { pickFolder } from './folder-picker.ts';
 import { addFolder, createNamed, HttpError } from './projects.ts';
@@ -20,6 +21,7 @@ export interface ApiDeps {
   runs: Runs;
   acp: AcpHost;
   external: External;
+  urlAgents: UrlAgents;
   routines: Routines;
   catalog: CatalogEntry[];
   projectsDir: string;
@@ -64,8 +66,8 @@ export function apiRoutes(d: ApiDeps): Router {
     events.emit({ type: 'conversation.removed', conversationId: id });
     d.routines.arm();
   };
-  // External agents have no native session to configure.
-  const externalSession = (c: Conversation, a: Agent): SessionInfo => ({ conversationId: c.id, agentId: a.id, options: [], commands: [], usage: null, ready: true });
+  // External and url agents have no native session to configure.
+  const noSession = (c: Conversation, a: Agent): SessionInfo => ({ conversationId: c.id, agentId: a.id, options: [], commands: [], usage: null, ready: true });
 
   return new Router()
     .on('GET', '/api/state', (): StateResponse => ({
@@ -113,7 +115,8 @@ export function apiRoutes(d: ApiDeps): Router {
       } else {
         const project = store.getProject(body.projectId);
         if (!project) throw new HttpError(404, 'Project not found.');
-        agent(body.agentId);
+        // A url agent has no access to this computer's folders.
+        if (agent(body.agentId).source === 'url') throw new HttpError(400, 'Agents connected by URL cannot work in a project on this computer.');
         created = store.insertConversation({
           kind: 'code', title: body.title?.trim() || project.name, avatar: null, memberIds: [body.agentId], leadId: null, projectId: project.id, hopLimit: 0,
         });
@@ -152,14 +155,14 @@ export function apiRoutes(d: ApiDeps): Router {
     .on('POST', '/api/conversations/:id/session', c => {
       const conv = conversation(c.params.id);
       const a = member(conv, parse(z.object({ agentId: z.string() }), c.body).agentId);
-      return a.source === 'external' ? externalSession(conv, a) : d.acp.info(a, conv);
+      return a.source === 'acp' ? d.acp.info(a, conv) : noSession(conv, a);
     })
 
     .on('POST', '/api/conversations/:id/session/option', c => {
       const conv = conversation(c.params.id);
       const body = parse(z.object({ agentId: z.string(), optionId: z.string(), value: z.union([z.string(), z.boolean()]) }), c.body);
       const a = member(conv, body.agentId);
-      if (a.source === 'external') throw new HttpError(400, 'External agents have no session options.');
+      if (a.source !== 'acp') throw new HttpError(400, 'Only agents on this computer have session options.');
       return d.acp.setOption(a, conv, body.optionId, body.value);
     })
 
@@ -185,6 +188,8 @@ export function apiRoutes(d: ApiDeps): Router {
 
     .on('POST', '/api/agents/external', () => ({ instruction: d.external.invite() }))
 
+    .on('POST', '/api/agents/url', async c => ({ agent: await d.urlAgents.connect(parse(connectSchema, c.body)) }))
+
     .on('POST', '/api/agents/:id/instruction', c => {
       const a = agent(c.params.id);
       if (a.source !== 'external') throw new HttpError(400, 'Only external agents join with an instruction.');
@@ -193,7 +198,7 @@ export function apiRoutes(d: ApiDeps): Router {
 
     .on('DELETE', '/api/agents/:id', c => {
       const a = agent(c.params.id);
-      if (a.source !== 'external') throw new HttpError(400, 'Only external agents can be removed. Installed agents leave when they are uninstalled.');
+      if (a.source === 'acp') throw new HttpError(400, 'Installed agents leave when they are uninstalled.');
       const groups = store.conversationsWithMember(a.id).filter(id => id !== a.chatId);
       removeConversation(a.chatId);
       for (const id of groups) runs.stop(id);

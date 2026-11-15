@@ -11,6 +11,7 @@ import { Auth, bearer, hostAllowed, loadOrCreateKey, originAllowed, SESSION_COOK
 import { openDb } from './db.ts';
 import { Events } from './events.ts';
 import { External, helloSchema, MAX_WAIT_SECONDS, postSchema, replySchema } from './external.ts';
+import { UrlAgents } from './url-agent.ts';
 import { dispatch, parse, Router, sendJson } from './http.ts';
 import { codeTaskSchema, messageToolSchema, readThreadSchema, routineToolSchema, ToolTokens, Tools } from './mcp/tools.ts';
 import { defaultWorkDir, hubPaths, projectsDir } from './paths.ts';
@@ -43,9 +44,11 @@ export async function createHub(options: HubOptions) {
   const webDist = options.webDist === undefined ? join(serverDir, '..', 'web', 'dist') : options.webDist;
 
   // No agent process survives a restart: installed agents start idle, external ones until they poll again.
+  // A url agent runs elsewhere, so it keeps the status of its last call.
   store.failInterruptedWork();
   for (const agent of store.listAgents()) {
-    store.updateAgent(agent.id, agent.source === 'acp' ? { status: 'available', statusDetail: null } : { status: 'offline', statusDetail: null });
+    if (agent.source === 'acp') store.updateAgent(agent.id, { status: 'available', statusDetail: null });
+    if (agent.source === 'external') store.updateAgent(agent.id, { status: 'offline', statusDetail: null });
   }
 
   let port = options.port;
@@ -59,7 +62,8 @@ export async function createHub(options: HubOptions) {
   const acp = new AcpHost({
     store, events, runs, catalog, tools: tokens, workDir: defaultWorkDir(options.userHome), bridgePath: join(serverDir, 'mcp', 'bridge.ts'), hubUrl,
   });
-  runs.executors = { acp, external };
+  const urlAgents = new UrlAgents(store, events, runs);
+  runs.executors = { acp, external, url: urlAgents };
   rescan(store, events, catalog);
 
   const auth = new Auth(store, key);
@@ -77,7 +81,7 @@ export async function createHub(options: HubOptions) {
     return closing;
   };
 
-  const api = apiRoutes({ store, events, runs, acp, external, routines, catalog, projectsDir: projectsDir(options.userHome), shutdown: options.onShutdown ?? (() => void close()) });
+  const api = apiRoutes({ store, events, runs, acp, external, urlAgents, routines, catalog, projectsDir: projectsDir(options.userHome), shutdown: options.onShutdown ?? (() => void close()) });
 
   type ToolCaller = { agentId: string; conversationId: string };
   const toolApi = new Router<ToolCaller>()

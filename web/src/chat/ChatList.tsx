@@ -92,7 +92,7 @@ export function ChatList() {
         )}
         {menu.open === 'agent' && (
           <Popover anchor={menu.anchor} onClose={menu.close} label="Add agent" width={360} align="end">
-            <AddAgentForm />
+            <AddAgentForm onDone={menu.close} />
           </Popover>
         )}
       </div>

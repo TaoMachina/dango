@@ -194,6 +194,13 @@ export async function inviteAgent() {
   return api<{ instruction: string }>('POST', '/api/agents/external', {});
 }
 
+/** Tests the API and creates the agent; a failed test throws with the hub's reason and shows no toast. */
+export async function connectUrlAgent(body: { baseUrl: string; apiKey?: string; model?: string }) {
+  const { agent } = await api<{ agent: Agent }>('POST', '/api/agents/url', body, true);
+  upsert('agents', agent);
+  return agent;
+}
+
 // ---------- Conversations ----------
 
 export async function createConversation(body: CreateConversationRequest) {
@@ -207,6 +214,13 @@ export async function patchConversation(
   body: { title?: string; avatar?: Avatar; memberIds?: ID[]; leadId?: ID | null; hopLimit?: number },
 ) {
   upsert('conversations', await api<Conversation>('PATCH', `/api/conversations/${id}`, body));
+}
+
+// Removes a pasted-in or URL agent with its chat; the hub's agent.removed and conversation.removed events update the lists.
+export async function removeAgent(agent: Agent) {
+  await api('DELETE', `/api/agents/${agent.id}`);
+  const ui = getState().ui;
+  if (ui.selected.chat === agent.chatId) select('chat', null);
 }
 
 export async function deleteConversation(id: ID) {

@@ -28,7 +28,18 @@ npm run setup
 - **Chat** — every detected agent has its own chat. Click a name or avatar to change it. **New group** puts agents together: a message without a mention goes to the group lead, `@Name` goes to that agent, and agents can `@` each other to hand off work. **Stop** halts everything running in the conversation.
 - **Routines** — open the side panel of a chat or group and add a schedule. Agentry sends the prompt to the agent at that time.
 - **Code** — add a project folder, start a thread with an agent, pick its model and mode, and follow its edits, commands and diffs. Agents can also start Code threads from Chat.
-- **Add agent** — for an agent Agentry can't launch itself, copy the instruction and paste it into that agent. It joins and says hello.
+- **Add agent** — for an agent Agentry can't launch itself, copy the instruction and paste it into that agent. It joins under its own name and says hello.
+- **Cloud agents** — an agent hosted elsewhere (for example Hermes or OpenClaw on a server) can join with **Add agent → Or connect an agent by URL**: give its OpenAI-compatible API address and key, and Agentry calls it whenever it is asked to work.
+
+### How agents join
+
+| Agent | How | Woken for new work |
+| --- | --- | --- |
+| Installed on this computer (Claude Code, Codex, Antigravity, OpenClaw, Hermes, Goose, OpenCode, Pi, …) | Found automatically | Yes, over ACP |
+| Hosted with an OpenAI-compatible API (Hermes, OpenClaw, …) | Connect by URL | Yes, Agentry calls it |
+| Anything else that can make HTTP calls on this computer | Paste the instruction | While it keeps its inbox request running |
+
+Hosted agents without an API can't be reached from your computer yet; sharing Agentry beyond this computer is planned.
 
 Permission requests from an agent appear in the conversation with the agent's own choices.
 

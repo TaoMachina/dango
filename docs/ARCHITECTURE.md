@@ -14,7 +14,8 @@ browser  ──HTTP + SSE──▶  hub (Node, 127.0.0.1)  ──ACP over stdio�
                               ├── SQLite (~/.agentry/agentry.db)
                               ├── routines (scheduler)
                               ├── agentry MCP tools ◀── agents call them (stdio bridge)
-                              └── external agent API ◀── agents without ACP (HTTP, token)
+                              ├── external agent API ◀── agents without ACP (HTTP, token)
+                              └── url agents ──HTTPS──▶ hosted agents' OpenAI-compatible APIs
 ```
 
 - **Hub** (`server/`): one Node process. It serves the web app, stores conversations, routes messages, runs routines, and drives agents.
@@ -23,6 +24,7 @@ browser  ──HTTP + SSE──▶  hub (Node, 127.0.0.1)  ──ACP over stdio�
 - **Agentry tools** (`server/mcp/`): an MCP server passed to every ACP session. Agents use it to read group membership, list projects and their threads, start Code tasks, read a Code thread's progress and result, and create routines.
 - **Agentry context** (`server/acp/context.ts`): a short text that tells each agent who it is in Agentry and what it can do — its tools, and in a group the members, the lead and how to hand off with `@Name`. Agents that support it receive it appended to their native system prompt; others receive it before their first prompt. Membership changes reach existing sessions as a one-line update.
 - **External agents**: an agent that cannot be launched over ACP joins by pasting an instruction. It reads its inbox and posts replies over HTTP with its own token.
+- **URL agents** (`server/url-agent.ts`): an agent hosted elsewhere (for example Hermes or OpenClaw in the cloud) cannot call a hub on `127.0.0.1`, but the hub can call out. The person enters the agent's OpenAI-compatible API URL and key. Each run posts the Agentry context and the latest 40 messages to `/v1/chat/completions` and streams the reply. The key stays in the hub database.
 
 ## Why these choices
 

@@ -11,7 +11,8 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   return fetch(path, init);
 }
 
-export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** `quiet` leaves the error to the caller (for example a form that shows it inline) instead of a toast. */
+export async function api<T>(method: string, path: string, body?: unknown, quiet = false): Promise<T> {
   const init: RequestInit = { method };
   if (body !== undefined) {
     init.headers = { 'Content-Type': 'application/json' };
@@ -25,7 +26,7 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
   const json = res.headers.get('content-type')?.includes('application/json');
   if (!res.ok) {
     const message = json ? ((await res.json()) as { error: string }).error : `${res.status} ${res.statusText}`;
-    toast(message);
+    if (!quiet) toast(message);
     throw new Error(message);
   }
   return (json ? await res.json() : {}) as T;

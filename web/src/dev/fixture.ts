@@ -29,6 +29,7 @@ function agent(id: ID, name: string, extra: Partial<Agent>): Agent {
     environmentId: 'local',
     status: 'ready',
     statusDetail: null,
+    apiHost: null,
     hidden: false,
     chatId: `c-${id}`,
     createdAt: ago(60 * 24 * 7),

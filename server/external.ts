@@ -60,31 +60,35 @@ export class External implements Executor {
     return this.text(token, agent.name);
   }
 
+  // Written as plain HTTP so any agent can follow it with whatever client it has (curl, PowerShell, fetch, ...).
   private text(token: string, name: string | null): string {
     const url = this.hubUrl();
-    const auth = `-H "Authorization: Bearer ${token}"`;
-    const json = '-H "Content-Type: application/json"';
     return [
       `You are invited to join Agentry${name ? ` as "${name}"` : ''}. Agentry is an app on this computer where a person chats with all of their AI agents in one place, alone or in groups.`,
       '',
-      `Agentry hub: ${url}`,
+      `Agentry hub: ${url} (reachable only from this computer)`,
       `Your token: ${token}`,
-      'Send it on every call as the header: Authorization: Bearer <token>',
+      'Send every request with the headers  Authorization: Bearer <token>  and  Content-Type: application/json',
+      'Use any HTTP client. In Windows PowerShell use Invoke-RestMethod; its "curl" is a different command.',
       '',
-      '1. Say hello once. Use the name the person knows you by, your product, a one-line description, and greet the person in one short line:',
-      `curl -s -X POST ${url}/agent-api/hello ${auth} ${json} -d '{"name":"${name ?? '<your name>'}","runtime":"<your product>","description":"<one line>","greeting":"<one short line>"}'`,
+      '1. Say hello once, using the name the person knows you by:',
+      `   POST ${url}/agent-api/hello`,
+      `   {"name": "${name ?? '<your name>'}", "runtime": "<your product>", "description": "<one line>", "greeting": "<one short line to the person>"}`,
       '',
-      `2. Wait for work. This call returns pending prompts, or [] after ${MAX_WAIT_SECONDS} seconds. Call it again right away and keep polling:`,
-      `curl -s "${url}/agent-api/inbox?wait=${MAX_WAIT_SECONDS}" ${auth}`,
-      'Each item is {"runId","conversationId","conversationTitle","messages":[{"author","text"}]}.',
+      '2. Receive work. Keep this request running in a loop in the background, starting the next call as soon as one returns:',
+      `   GET ${url}/agent-api/inbox?wait=${MAX_WAIT_SECONDS}`,
+      `   It returns a list of items, or [] after ${MAX_WAIT_SECONDS} seconds. Each item is {"runId", "conversationId", "conversationTitle", "messages": [{"author", "text"}]}.`,
       '',
-      '3. Answer each item once. This posts your reply and completes the item:',
-      `curl -s -X POST ${url}/agent-api/reply ${auth} ${json} -d '{"runId":"<runId>","text":"<your reply in Markdown>"}'`,
+      '3. Answer each item once. This posts your reply and completes it:',
+      `   POST ${url}/agent-api/reply`,
+      '   {"runId": "<runId>", "text": "<your reply in Markdown>"}',
       '',
-      '4. To post into a conversation without being asked:',
-      `curl -s -X POST ${url}/agent-api/messages ${auth} ${json} -d '{"conversationId":"<id>","text":"<message>"}'`,
+      '4. Post into a conversation without being asked:',
+      `   POST ${url}/agent-api/messages`,
+      '   {"conversationId": "<id>", "text": "<message>"}',
       '',
-      `Agentry shows you as offline when you stop polling for ${OFFLINE_AFTER_MS / 1000} seconds.`,
+      `Agentry shows you as offline when no inbox request arrives for ${OFFLINE_AFTER_MS / 1000} seconds.`,
+      'If you cannot keep a background loop running, still say hello, and say in your greeting that you only check Agentry when the person asks you to.',
     ].join('\n');
   }
 

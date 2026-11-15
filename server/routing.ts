@@ -6,7 +6,7 @@ export type RunOutcome = { status: 'done' | 'stopped'; note?: string };
 export type PermissionAnswer = { optionId: string } | { cancelled: true };
 export type StoredRun = Run & { prompt: string | null };
 
-// Runs one agent turn. ACP agents and external (HTTP) agents each provide one.
+// Runs one agent turn. ACP agents, external (polling) agents and url (OpenAI-compatible API) agents each provide one.
 export interface Executor {
   execute(live: LiveRun): Promise<RunOutcome>;
   cancel(live: LiveRun): void;
@@ -207,7 +207,7 @@ export class Runs {
   events: Events;
   lives = new Map<ID, LiveRun>();
   permissions = new Map<string, { live: LiveRun; index: number; resolve: (answer: PermissionAnswer) => void }>();
-  executors: { acp: Executor; external: Executor } | null = null;
+  executors: Record<Agent['source'], Executor> | null = null;
   // Runs for the same agent session run one after another: ACP allows one prompt per session at a time.
   private queues = new Map<string, Promise<void>>();
 
@@ -217,7 +217,7 @@ export class Runs {
   }
 
   executorFor(agent: Agent): Executor {
-    return agent.source === 'external' ? this.executors!.external : this.executors!.acp;
+    return this.executors![agent.source];
   }
 
   members(conversation: Conversation): Agent[] {

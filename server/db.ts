@@ -134,6 +134,16 @@ const migrations: string[] = [
     created_at TEXT NOT NULL
   );
   `,
+  `
+  -- Agents the hub calls over an OpenAI-compatible API. The key stays here and is never sent to the browser.
+  CREATE TABLE url_agents (
+    agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+    base_url TEXT NOT NULL,
+    api_key TEXT,
+    model TEXT,
+    session_header TEXT
+  );
+  `,
 ];
 
 export function openDb(file: string): DatabaseSync {
