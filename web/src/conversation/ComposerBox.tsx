@@ -15,7 +15,6 @@ interface Props {
   placeholder: string;
   running?: boolean;
   onStop?: () => void;
-  plus?: ReactNode;
   suggestions?: Suggestion[];
   onPick?: (suggestion: Suggestion) => void;
   onDismiss?: () => void;
@@ -24,9 +23,9 @@ interface Props {
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
 }
 
-/** The pill composer: + on the left, auto-growing text, round send button that turns into Stop. */
+/** The pill composer: auto-growing text and a round send button that turns into Stop. */
 export function ComposerBox(props: Props) {
-  const { value, onChange, onSubmit, placeholder, running, onStop, plus, suggestions = [], onPick, onDismiss, autoFocus, busy } = props;
+  const { value, onChange, onSubmit, placeholder, running, onStop, suggestions = [], onPick, onDismiss, autoFocus, busy } = props;
   const ownRef = useRef<HTMLTextAreaElement>(null);
   const ref = props.textareaRef ?? ownRef;
   const [active, setActive] = useState(0);
@@ -68,7 +67,6 @@ export function ComposerBox(props: Props) {
         </ul>
       )}
       <div className="flex items-end gap-1.5 rounded-[26px] border border-line bg-bg p-1.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] focus-within:border-faint">
-        {plus}
         <textarea
           ref={ref}
           rows={1}
@@ -102,7 +100,7 @@ export function ComposerBox(props: Props) {
             }
           }}
           // Cap the height so the conversation above stays visible.
-          className="max-h-[40dvh] min-h-9 flex-1 resize-none bg-transparent px-2 py-[7px] text-[15px] leading-[22px] text-fg placeholder:text-muted focus-visible:outline-none"
+          className="max-h-[40dvh] min-h-9 flex-1 resize-none bg-transparent py-[7px] pl-2.5 pr-1 text-[15px] leading-[22px] text-fg placeholder:text-muted focus-visible:outline-none"
         />
         {showStop ? (
           <button

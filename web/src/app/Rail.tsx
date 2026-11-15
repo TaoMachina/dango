@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Code2, MessageCircle, Power, RefreshCw, Settings } from 'lucide-react';
-import { BLOB_SHAPES } from '../components/Avatar.tsx';
+import { SidebarToggle } from '../components/MenuToggle.tsx';
 import { Popover, usePopover } from '../components/Popover.tsx';
 import { MenuItem, Spinner } from '../components/ui.tsx';
-import { rescan, selectModule, shutdown } from '../lib/actions.ts';
+import { rescan, selectModule, shutdown, toggleList } from '../lib/actions.ts';
 import { closeEvents } from '../lib/events.ts';
+import { useMedia, WIDE_LIST } from '../lib/media.ts';
 import { useStore, type Module } from '../lib/store.ts';
 
 const MODULES: { id: Module; label: string; Icon: typeof MessageCircle }[] = [
@@ -46,15 +47,15 @@ function SettingsMenu() {
 
 export function Rail() {
   const module = useStore((s) => s.ui.module);
+  const collapsed = useStore((s) => s.ui.listCollapsed);
+  const wide = useMedia(WIDE_LIST);
   const settings = usePopover();
+  // On narrow screens the rail only shows inside the open drawer, so the list is always expanded there.
+  const expanded = wide ? !collapsed : true;
   return (
-    <nav aria-label="Modules" className="flex h-full w-[60px] shrink-0 flex-col items-center gap-1 py-3">
-      <div className="mb-3" title="Agentry">
-        <svg width={28} height={28} viewBox="0 0 100 100" aria-hidden="true">
-          <path d={BLOB_SHAPES[0].path} fill="var(--fg)" />
-          <ellipse cx={39} cy={50} rx={4.5} ry={7} fill="var(--bg)" />
-          <ellipse cx={61} cy={50} rx={4.5} ry={7} fill="var(--bg)" />
-        </svg>
+    <nav aria-label="Modules" className="flex h-full w-[60px] shrink-0 flex-col items-center gap-1 pb-3">
+      <div className="mb-1 flex h-14 shrink-0 items-center">
+        <SidebarToggle expanded={expanded} onClick={() => toggleList(wide)} />
       </div>
       {MODULES.map(({ id, label, Icon }) => (
         <button

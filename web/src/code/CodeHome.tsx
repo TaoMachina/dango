@@ -5,11 +5,10 @@ import { useStore } from '../lib/store.ts';
 /** Code with nothing selected. */
 export function CodeHome() {
   const hasProjects = useStore((s) => Object.keys(s.projects).length > 0);
-  const collapsed = useStore((s) => s.ui.listCollapsed);
   const wide = useMedia(WIDE_LIST);
   return (
     <div className="flex h-full flex-col">
-      {(!wide || collapsed) && (
+      {!wide && (
         <div className="flex h-14 items-center px-3">
           <MenuToggle />
         </div>

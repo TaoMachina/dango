@@ -33,13 +33,10 @@ export function findMentions(text: string, agents: Agent[]): ID[] {
   return found;
 }
 
-export function formatPrompt(conversation: Conversation, agent: Agent, members: Agent[], lines: PromptLine[], intro: boolean): string {
+// A group agent sees who wrote each message; a chat or code agent gets the text as the person wrote it.
+export function formatPrompt(conversation: Conversation, lines: PromptLine[]): string {
   if (conversation.kind !== 'group') return lines.map(l => l.text).join('\n\n');
-  const body = lines.map(l => `[${l.author}]: ${l.text}`).join('\n\n');
-  if (!intro) return body;
-  const others = members.filter(m => m.id !== agent.id).map(m => `@${m.name} (${m.runtimeLabel})`).join(', ');
-  return `You are ${agent.name} in the Agentry group "${conversation.title}" with ${others || 'no other agents'}. ` +
-    `Group messages reach you as [Author]: text. Write @Name to hand work to a member. Your reply is posted to the group.\n\n${body}`;
+  return lines.map(l => `[${l.author}]: ${l.text}`).join('\n\n');
 }
 
 // One active agent turn: owns the agent message it streams into.
@@ -180,6 +177,7 @@ export class LiveRun {
     this.runs.emitRun(this.run);
     this.runs.emitConversation(this.conversation.id);
     this.runs.emitAgent(this.agent.id);
+    this.runs.reportToRequester(this.conversation, this.agent, status);
     // An agent's @mention hands work to that member, up to the group's hop limit.
     const conversation = store.getConversation(this.conversation.id);
     if (status === 'done' && message && conversation && this.run.depth + 1 <= conversation.hopLimit) {
@@ -272,6 +270,15 @@ export class Runs {
     } catch (error) {
       live.finish('error', error instanceof Error ? error.message : String(error));
     }
+  }
+
+  // A code thread started by an agent tells the conversation that asked for it when a run ends. The note starts no run.
+  reportToRequester(conversation: Conversation, agent: Agent, status: 'done' | 'stopped' | 'error') {
+    const requester = this.store.requestedFrom(conversation.id);
+    if (!requester) return;
+    const link = `[${conversation.title}](?m=code&c=${conversation.id})`;
+    const text = status === 'done' ? `${agent.name} finished ${link}.` : status === 'stopped' ? `${agent.name} stopped ${link}.` : `${agent.name} hit an error in ${link}.`;
+    this.postMessage(requester, { type: 'system' }, text);
   }
 
   // Stop cancels every queued and active run in the conversation. A stopped run never resumes.

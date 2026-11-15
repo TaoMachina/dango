@@ -25,7 +25,7 @@ server.registerTool('agentry_conversation', {
 }, () => call('GET', 'conversation'));
 
 server.registerTool('agentry_list_projects', {
-  description: 'List the project folders Agentry knows (id, name, absolute path).',
+  description: 'List the project folders Agentry knows (id, name, absolute path), each with its Code threads (id, title, last activity, status).',
 }, () => call('GET', 'projects'));
 
 server.registerTool('agentry_start_code_task', {
@@ -37,6 +37,11 @@ server.registerTool('agentry_start_code_task', {
     title: z.string().optional().describe('Short title for the Code thread.'),
   },
 }, args => call('POST', 'code-task', args));
+
+server.registerTool('agentry_read_code_thread', {
+  description: 'Read a Code thread: its project, agent, status (running, done, error or stopped) and latest messages, with tool calls summarized as one line each.',
+  inputSchema: { conversation: z.string().describe('The Code thread id or title.') },
+}, args => call('POST', 'code-thread', args));
 
 server.registerTool('agentry_create_routine', {
   description: 'Schedule a routine in the current conversation. When it fires, you receive the prompt here. Times are local. ' +

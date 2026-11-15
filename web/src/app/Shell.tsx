@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Drawer } from '../components/Drawer.tsx';
 import { ChatList } from '../chat/ChatList.tsx';
 import { ChatHome } from '../chat/ChatHome.tsx';
@@ -6,6 +7,7 @@ import { CodeHome } from '../code/CodeHome.tsx';
 import { NewThread } from '../code/NewThread.tsx';
 import { ConversationView } from '../conversation/ConversationView.tsx';
 import { RightPanel } from '../panels/RightPanel.tsx';
+import { toggleList } from '../lib/actions.ts';
 import { updateUI, useStore } from '../lib/store.ts';
 import { useMedia, WIDE_LIST, WIDE_PANEL } from '../lib/media.ts';
 import { Rail } from './Rail.tsx';
@@ -15,7 +17,7 @@ function Sidebar({ showList }: { showList: boolean }) {
   return (
     <div className="flex h-full bg-sidebar">
       <Rail />
-      {showList && <div className="flex h-full w-[300px] max-w-[calc(88vw-60px)] flex-col">{module === 'chat' ? <ChatList /> : <CodeList />}</div>}
+      {showList && <div className="flex h-full w-[300px] max-w-[calc(88vw-60px)] flex-col border-l border-line">{module === 'chat' ? <ChatList /> : <CodeList />}</div>}
     </div>
   );
 }
@@ -38,6 +40,17 @@ export function Shell() {
   const id = ui.selected[ui.module];
   const conversation = id && !(ui.module === 'code' && ui.newThreadProjectId) ? conversations[id] : undefined;
   const closeDrawer = () => updateUI({ drawer: null });
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleList(matchMedia(WIDE_LIST).matches);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <div className="flex h-dvh overflow-hidden bg-bg text-fg">

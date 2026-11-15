@@ -8,7 +8,8 @@ import { defaultAvatar, rescan } from './agents/registry.ts';
 import type { Events } from './events.ts';
 import { NEW_AGENT_NAME, type External } from './external.ts';
 import { parse, Router } from './http.ts';
-import { createProject, HttpError, listFolders } from './projects.ts';
+import { pickFolder } from './folder-picker.ts';
+import { addFolder, createNamed, HttpError } from './projects.ts';
 import { scheduleSchema, type Routines } from './routines.ts';
 import { publicRun, type Runs } from './routing.ts';
 import type { Store } from './store.ts';
@@ -21,6 +22,7 @@ export interface ApiDeps {
   external: External;
   routines: Routines;
   catalog: CatalogEntry[];
+  projectsDir: string;
   shutdown: () => void;
 }
 
@@ -62,8 +64,8 @@ export function apiRoutes(d: ApiDeps): Router {
     events.emit({ type: 'conversation.removed', conversationId: id });
     d.routines.arm();
   };
-  const sessionFor = async (c: Conversation, a: Agent, action: () => Promise<SessionInfo>): Promise<SessionInfo> =>
-    a.source === 'external' ? { conversationId: c.id, agentId: a.id, options: [], commands: [] } : action();
+  // External agents have no native session to configure.
+  const externalSession = (c: Conversation, a: Agent): SessionInfo => ({ conversationId: c.id, agentId: a.id, options: [], commands: [], usage: null, ready: true });
 
   return new Router()
     .on('GET', '/api/state', (): StateResponse => ({
@@ -150,7 +152,7 @@ export function apiRoutes(d: ApiDeps): Router {
     .on('POST', '/api/conversations/:id/session', c => {
       const conv = conversation(c.params.id);
       const a = member(conv, parse(z.object({ agentId: z.string() }), c.body).agentId);
-      return sessionFor(conv, a, () => d.acp.info(a, conv));
+      return a.source === 'external' ? externalSession(conv, a) : d.acp.info(a, conv);
     })
 
     .on('POST', '/api/conversations/:id/session/option', c => {
@@ -208,8 +210,8 @@ export function apiRoutes(d: ApiDeps): Router {
     // ---------- projects and folders ----------
 
     .on('POST', '/api/projects', c => {
-      const body = parse(z.object({ path: z.string().min(1), name: z.string().optional() }), c.body);
-      return createProject(store, events, body.path, body.name);
+      const body = parse(z.union([z.object({ path: z.string().min(1) }), z.object({ name: z.string().min(1) })]), c.body);
+      return 'path' in body ? addFolder(store, events, body.path) : createNamed(store, events, d.projectsDir, body.name);
     })
 
     .on('DELETE', '/api/projects/:id', c => {
@@ -218,7 +220,7 @@ export function apiRoutes(d: ApiDeps): Router {
       return {};
     })
 
-    .on('POST', '/api/fs/list', c => listFolders(parse(z.object({ path: z.string().nullable() }), c.body).path))
+    .on('POST', '/api/fs/pick-folder', async () => ({ path: await pickFolder() }))
 
     // ---------- routines ----------
 

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   Agent, Avatar, Conversation, ConversationKind, ID, Message, MessageAuthor, Part, Project, Routine, Run, Schedule,
 } from '../shared/types.ts';
+import type { Choice, SessionState } from './acp/mapping.ts';
 
 export const newId = () => randomUUID();
 export const now = () => new Date().toISOString();
@@ -102,11 +103,11 @@ export class Store {
     return r ? this.conversationFrom(r) : null;
   }
 
-  insertConversation(c: { id?: ID; kind: ConversationKind; title: string; avatar: Avatar | null; memberIds: ID[]; leadId: ID | null; projectId: ID | null; hopLimit: number }): Conversation {
+  insertConversation(c: { id?: ID; kind: ConversationKind; title: string; avatar: Avatar | null; memberIds: ID[]; leadId: ID | null; projectId: ID | null; hopLimit: number; requestedFrom?: ID }): Conversation {
     const id = c.id ?? newId();
     const at = now();
-    this.db.prepare(`INSERT INTO conversations (id, kind, title, avatar, lead_id, project_id, hop_limit, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, c.kind, c.title, c.avatar && JSON.stringify(c.avatar), c.leadId, c.projectId, c.hopLimit, at, at);
+    this.db.prepare(`INSERT INTO conversations (id, kind, title, avatar, lead_id, project_id, hop_limit, requested_from, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, c.kind, c.title, c.avatar && JSON.stringify(c.avatar), c.leadId, c.projectId, c.hopLimit, c.requestedFrom ?? null, at, at);
     this.setMembers(id, c.memberIds);
     return this.getConversation(id)!;
   }
@@ -123,6 +124,10 @@ export class Store {
       lead_id: patch.leadId, hop_limit: patch.hopLimit, updated_at: now(),
     });
     return this.getConversation(id)!;
+  }
+
+  requestedFrom(id: ID): ID | null {
+    return (this.db.prepare('SELECT requested_from FROM conversations WHERE id = ?').get(id) as Row | undefined)?.requested_from ?? null;
   }
 
   touchConversation(id: ID) {
@@ -209,6 +214,15 @@ export class Store {
     return this.getRun(id)!;
   }
 
+  hasRuns(conversationId: ID, agentId: ID): boolean {
+    return this.count('SELECT COUNT(*) AS n FROM runs WHERE conversation_id = ? AND agent_id = ?', conversationId, agentId) > 0;
+  }
+
+  latestRun(conversationId: ID) {
+    const r = this.db.prepare('SELECT * FROM runs WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1').get(conversationId) as Row | undefined;
+    return r ? this.runFrom(r) : null;
+  }
+
   activeRuns(conversationId: ID) {
     return this.db.prepare(`SELECT * FROM runs WHERE conversation_id = ? AND status IN ('queued', 'running') ORDER BY created_at`)
       .all(conversationId).map(r => this.runFrom(r as Row));
@@ -233,14 +247,40 @@ export class Store {
 
   // ---------- agent sessions and cursors ----------
 
-  getAcpSession(agentId: ID, conversationId: ID): { sessionId: string; cwd: string } | null {
+  getAcpSession(agentId: ID, conversationId: ID): { sessionId: string; cwd: string; usage: SessionState['usage'] } | null {
     const r = this.db.prepare('SELECT * FROM acp_sessions WHERE agent_id = ? AND conversation_id = ?').get(agentId, conversationId) as Row | undefined;
-    return r ? { sessionId: r.session_id, cwd: r.cwd } : null;
+    return r ? { sessionId: r.session_id, cwd: r.cwd, usage: r.usage ? JSON.parse(r.usage) : null } : null;
   }
 
+  // A new session starts with no usage reported yet.
   saveAcpSession(agentId: ID, conversationId: ID, sessionId: string, cwd: string) {
-    this.db.prepare(`INSERT INTO acp_sessions (agent_id, conversation_id, session_id, cwd) VALUES (?, ?, ?, ?)
-      ON CONFLICT (agent_id, conversation_id) DO UPDATE SET session_id = excluded.session_id, cwd = excluded.cwd`).run(agentId, conversationId, sessionId, cwd);
+    this.db.prepare(`INSERT INTO acp_sessions (agent_id, conversation_id, session_id, cwd, usage) VALUES (?, ?, ?, ?, NULL)
+      ON CONFLICT (agent_id, conversation_id) DO UPDATE SET session_id = excluded.session_id, cwd = excluded.cwd, usage = NULL`).run(agentId, conversationId, sessionId, cwd);
+  }
+
+  saveUsage(agentId: ID, conversationId: ID, usage: SessionState['usage']) {
+    this.db.prepare('UPDATE acp_sessions SET usage = ? WHERE agent_id = ? AND conversation_id = ?').run(JSON.stringify(usage), agentId, conversationId);
+  }
+
+  getSessionCache(agentId: ID): Omit<SessionState, 'usage'> | null {
+    const r = this.db.prepare('SELECT * FROM agent_session_cache WHERE agent_id = ?').get(agentId) as Row | undefined;
+    return r ? { configOptions: JSON.parse(r.config_options), modes: r.modes ? JSON.parse(r.modes) : null, commands: JSON.parse(r.commands) } : null;
+  }
+
+  saveSessionCache(agentId: ID, state: SessionState) {
+    this.db.prepare(`INSERT INTO agent_session_cache (agent_id, config_options, modes, commands) VALUES (?, ?, ?, ?)
+      ON CONFLICT (agent_id) DO UPDATE SET config_options = excluded.config_options, modes = excluded.modes, commands = excluded.commands`)
+      .run(agentId, JSON.stringify(state.configOptions), state.modes && JSON.stringify(state.modes), JSON.stringify(state.commands));
+  }
+
+  listChoices(agentId: ID, conversationId: ID): Choice[] {
+    return this.db.prepare('SELECT option_id, value FROM session_choices WHERE agent_id = ? AND conversation_id = ? ORDER BY rowid').all(agentId, conversationId)
+      .map(r => ({ optionId: (r as Row).option_id, value: JSON.parse((r as Row).value) }));
+  }
+
+  saveChoice(agentId: ID, conversationId: ID, choice: Choice) {
+    this.db.prepare(`INSERT INTO session_choices (agent_id, conversation_id, option_id, value) VALUES (?, ?, ?, ?)
+      ON CONFLICT (agent_id, conversation_id, option_id) DO UPDATE SET value = excluded.value`).run(agentId, conversationId, choice.optionId, JSON.stringify(choice.value));
   }
 
   getCursor(agentId: ID, conversationId: ID): { seenSeq: number; skipped: number[] } {

@@ -18,7 +18,12 @@ export function hubPort(): number {
   return Number(process.env.AGENTRY_PORT ?? 7420);
 }
 
-// Chats without a project run in this folder, so agents never start in a system directory.
-export function defaultWorkDir(): string {
-  return join(homedir(), 'Agentry');
+// Chat and group sessions run in this folder, so agents never start in a system directory.
+export function defaultWorkDir(userHome = homedir()): string {
+  return join(userHome, 'Agentry', 'chat');
+}
+
+// Projects created by name live here.
+export function projectsDir(userHome = homedir()): string {
+  return join(userHome, 'Agentry', 'projects');
 }

@@ -1,10 +1,10 @@
 // The hub side of the Agentry tools that agents call through server/mcp/bridge.ts.
 import { randomBytes } from 'node:crypto';
-import { isAbsolute, resolve } from 'node:path';
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
-import type { ID } from '../../shared/types.ts';
+import type { Conversation, ID, Part, RunStatus } from '../../shared/types.ts';
 import type { Events } from '../events.ts';
-import { createProject, HttpError } from '../projects.ts';
+import { folderProject, HttpError } from '../projects.ts';
 import { scheduleSchema, type Routines } from '../routines.ts';
 import type { Runs } from '../routing.ts';
 import type { Store } from '../store.ts';
@@ -28,6 +28,26 @@ export class ToolTokens {
 export const codeTaskSchema = z.object({ project: z.string().min(1), agent: z.string().optional(), prompt: z.string().min(1), title: z.string().optional() });
 export const routineToolSchema = z.object({ title: z.string().min(1), prompt: z.string().min(1), schedule: scheduleSchema });
 export const messageToolSchema = z.object({ text: z.string().min(1) });
+export const readThreadSchema = z.object({ conversation: z.string().min(1) });
+
+// 20 messages give enough recent context for a status check without flooding the caller's context window.
+const READ_MESSAGES = 20;
+
+const threadStatus = (status: RunStatus | undefined) => (status === 'queued' || status === 'running' ? 'running' : status ?? null);
+
+// Text as written; tool calls and other activity as one line each. Thoughts stay out.
+function summary(parts: Part[]): string {
+  return parts.flatMap(p => {
+    switch (p.type) {
+      case 'text': return [p.text];
+      case 'tool': return [`[tool] ${p.title || p.kind} (${p.status})`];
+      case 'permission': return [`[permission] ${p.title}${p.outcome ? '' : ' (waiting for the person)'}`];
+      case 'error': return [`[error] ${p.text}`];
+      case 'image': return ['[image]'];
+      default: return [];
+    }
+  }).join('\n');
+}
 
 export class Tools {
   private store: Store;
@@ -55,8 +75,37 @@ export class Tools {
     };
   }
 
+  private codeThreads(): Conversation[] {
+    return this.store.listConversations().filter(c => c.kind === 'code');
+  }
+
   projects() {
-    return { projects: this.store.listProjects().map(p => ({ id: p.id, name: p.name, path: p.path })) };
+    const threads = this.codeThreads();
+    return {
+      projects: this.store.listProjects().map(p => ({
+        id: p.id, name: p.name, path: p.path,
+        threads: threads.filter(c => c.projectId === p.id).map(c => ({
+          id: c.id, title: c.title, lastActivity: c.updatedAt, status: threadStatus(this.store.latestRun(c.id)?.status),
+        })),
+      })),
+    };
+  }
+
+  readCodeThread(input: z.infer<typeof readThreadSchema>) {
+    const wanted = input.conversation.trim();
+    // Conversations come newest first, so a repeated title finds the latest thread.
+    const thread = this.codeThreads().find(c => c.id === wanted || c.title.toLowerCase() === wanted.toLowerCase());
+    if (!thread) throw new HttpError(404, `No Code thread "${wanted}". agentry_list_projects lists them.`);
+    const project = thread.projectId ? this.store.getProject(thread.projectId) : null;
+    const agent = this.store.getAgent(thread.memberIds[0]);
+    return {
+      title: thread.title,
+      project: project && { name: project.name, path: project.path },
+      agent: agent?.name ?? null,
+      status: threadStatus(this.store.latestRun(thread.id)?.status),
+      messages: this.store.listMessages(thread.id, null, READ_MESSAGES).messages.map(m => this.runs.currentMessage(m))
+        .map(m => ({ author: this.store.authorName(m.author), text: summary(m.parts) })),
+    };
   }
 
   startCodeTask(caller: { agentId: ID; conversationId: ID }, input: z.infer<typeof codeTaskSchema>) {
@@ -64,7 +113,7 @@ export class Tools {
     const wanted = input.project.trim();
     const projects = this.store.listProjects();
     const project = projects.find(p => p.id === wanted || p.name.toLowerCase() === wanted.toLowerCase())
-      ?? (isAbsolute(wanted) ? projects.find(p => p.path === resolve(wanted)) ?? createProject(this.store, this.events, wanted) : null);
+      ?? (isAbsolute(wanted) ? folderProject(this.store, this.events, wanted) : null);
     if (!project) throw new HttpError(404, `No project named "${wanted}". Pass a project id, name or absolute folder path.`);
     const agentName = input.agent?.trim().toLowerCase();
     const agent = agentName
@@ -72,7 +121,9 @@ export class Tools {
       : requester;
     if (!agent) throw new HttpError(404, `No agent named "${input.agent}".`);
     const title = input.title?.trim() || project.name;
-    const conversation = this.store.insertConversation({ kind: 'code', title, avatar: null, memberIds: [agent.id], leadId: null, projectId: project.id, hopLimit: 0 });
+    const conversation = this.store.insertConversation({
+      kind: 'code', title, avatar: null, memberIds: [agent.id], leadId: null, projectId: project.id, hopLimit: 0, requestedFrom: caller.conversationId,
+    });
     this.events.emit({ type: 'conversation.upsert', conversation });
     this.runs.postUserMessage(conversation, `From ${requester.name}: ${input.prompt}`, []);
     this.runs.postMessage(caller.conversationId, { type: 'system' }, `${requester.name} started the code task [${title}](?m=code&c=${conversation.id}) for ${agent.name} in ${project.name}.`);

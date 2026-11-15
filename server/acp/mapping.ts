@@ -1,6 +1,6 @@
 // Maps ACP session updates onto Agentry message parts and session settings.
 import type * as acp from '@agentclientprotocol/sdk';
-import type { ID, Part, SessionInfo, SessionOption, ToolContent } from '../../shared/types.ts';
+import type { ConversationKind, ID, Part, SessionInfo, SessionOption, ToolContent } from '../../shared/types.ts';
 import type { LiveRun } from '../routing.ts';
 
 export interface SessionState {
@@ -8,13 +8,17 @@ export interface SessionState {
   // Agents without a "mode" config option may still report the older session modes.
   modes: acp.SessionModeState | null;
   commands: { name: string; description: string }[];
+  usage: { used: number; size: number } | null;
 }
+
+// A value the person or the hub chose for one option in one conversation.
+export interface Choice { optionId: string; value: string | boolean }
 
 // The id under which session modes appear when the agent reports them only as `modes`.
 export const LEGACY_MODE_ID = 'acp:mode';
 
 export function stateFrom(response: { modes?: acp.SessionModeState | null; configOptions?: acp.SessionConfigOption[] | null }): SessionState {
-  return { configOptions: response.configOptions ?? [], modes: response.modes ?? null, commands: [] };
+  return { configOptions: response.configOptions ?? [], modes: response.modes ?? null, commands: [], usage: null };
 }
 
 function optionFrom(o: acp.SessionConfigOption): SessionOption {
@@ -24,10 +28,8 @@ function optionFrom(o: acp.SessionConfigOption): SessionOption {
   return { ...common, type: 'select', currentValue: o.currentValue, choices };
 }
 
-// The contract asks for the model first, then the mode, then the rest in the agent's order.
-const CATEGORY_ORDER = ['model', 'mode'];
-
-export function sessionInfo(conversationId: ID, agentId: ID, state: SessionState): SessionInfo {
+// Every option the agent reports, with legacy modes as one more select.
+export function allOptions(state: SessionState): SessionOption[] {
   const options = state.configOptions.map(optionFrom);
   if (state.modes && !options.some(o => o.category === 'mode')) {
     options.push({
@@ -35,12 +37,63 @@ export function sessionInfo(conversationId: ID, agentId: ID, state: SessionState
       choices: state.modes.availableModes.map(m => ({ value: m.id, name: m.name, description: m.description ?? null })),
     });
   }
-  const rank = (o: SessionOption) => {
-    const i = CATEGORY_ORDER.indexOf(o.category ?? '');
-    return i < 0 ? CATEGORY_ORDER.length : i;
-  };
-  options.sort((a, b) => rank(a) - rank(b));
-  return { conversationId, agentId, options, commands: state.commands };
+  return options;
+}
+
+// Claude Code reports its effort as 'thought_level'; an agent that leaves the category out still names it effort.
+const isEffort = (o: SessionOption) => o.category === 'thought_level' || /effort/i.test(o.id);
+
+// Chats and groups are for talking and delegating, so they show only model and effort.
+// Code threads show model, effort and mode first, then the rest in the agent's order. null hides the option.
+function rank(kind: ConversationKind, o: SessionOption): number | null {
+  if (o.category === 'model') return 0;
+  if (isEffort(o)) return 1;
+  if (kind !== 'code') return null;
+  return o.category === 'mode' ? 2 : 3;
+}
+
+// The web app finds the model and effort controls by category, so an option matched by its id reports that category.
+function normalized(o: SessionOption): SessionOption {
+  if (o.id === 'model' && o.category !== 'model') return { ...o, category: 'model' };
+  if (isEffort(o) && o.category !== 'thought_level') return { ...o, category: 'thought_level' };
+  return o;
+}
+
+export function sessionInfo(conversation: { id: ID; kind: ConversationKind }, agentId: ID, state: SessionState, ready: boolean): SessionInfo {
+  const ranked = allOptions(state).map(normalized).flatMap(o => {
+    const r = rank(conversation.kind, o);
+    return r === null ? [] : [{ o, r }];
+  });
+  ranked.sort((a, b) => a.r - b.r);
+  return { conversationId: conversation.id, agentId, options: ranked.map(x => x.o), commands: state.commands, usage: state.usage, ready };
+}
+
+// Whether `value` is one the option offers, and differs from its current value.
+export function changes(state: SessionState, choice: Choice): boolean {
+  const option = allOptions(state).find(o => o.id === choice.optionId);
+  if (!option || option.currentValue === choice.value) return false;
+  return option.type === 'boolean' ? typeof choice.value === 'boolean' : option.choices.some(c => c.value === choice.value);
+}
+
+// The state as it will be once the choices are applied; shown while the session is still starting.
+export function withChoices(state: SessionState, choices: Choice[]): SessionState {
+  const next: SessionState = structuredClone(state);
+  for (const choice of choices) {
+    if (!changes(next, choice)) continue;
+    if (choice.optionId === LEGACY_MODE_ID) next.modes!.currentModeId = String(choice.value);
+    else next.configOptions = next.configOptions.map(o => (o.id === choice.optionId ? { ...o, currentValue: choice.value } as acp.SessionConfigOption : o));
+  }
+  return next;
+}
+
+// Chats and groups turn fast mode off: Codex reports it as 'fast-mode', a model_config select of off/on.
+export function chatDefaults(state: SessionState): Choice[] {
+  return allOptions(state).flatMap((o): Choice[] => {
+    if (o.category !== 'speed' && !/fast/i.test(o.id)) return [];
+    if (o.type === 'boolean') return [{ optionId: o.id, value: false }];
+    const off = o.choices.find(c => /^off$/i.test(c.value));
+    return off ? [{ optionId: o.id, value: off.value }] : [];
+  });
 }
 
 function blockText(block: acp.ContentBlock): string | null {

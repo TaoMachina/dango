@@ -20,7 +20,8 @@ browser  ──HTTP + SSE──▶  hub (Node, 127.0.0.1)  ──ACP over stdio�
 - **Hub** (`server/`): one Node process. It serves the web app, stores conversations, routes messages, runs routines, and drives agents.
 - **Web app** (`web/`): React. Chat and Code share one visual system modeled on Grok Bot.
 - **Agent host** (`server/acp/`): detects installed agents and talks to them with the [Agent Client Protocol](https://agentclientprotocol.com). One process per agent. One ACP session per agent per conversation.
-- **Agentry tools** (`server/mcp/`): an MCP server passed to every ACP session. Agents use it to read group membership, start Code tasks and create routines.
+- **Agentry tools** (`server/mcp/`): an MCP server passed to every ACP session. Agents use it to read group membership, list projects and their threads, start Code tasks, read a Code thread's progress and result, and create routines.
+- **Agentry context** (`server/acp/context.ts`): a short text that tells each agent who it is in Agentry and what it can do — its tools, and in a group the members, the lead and how to hand off with `@Name`. Agents that support it receive it appended to their native system prompt; others receive it before their first prompt. Membership changes reach existing sessions as a one-line update.
 - **External agents**: an agent that cannot be launched over ACP joins by pasting an instruction. It reads its inbox and posts replies over HTTP with its own token.
 
 ## Why these choices
@@ -57,4 +58,4 @@ The hub listens on `127.0.0.1` only. A random key in `~/.agentry/key` is exchang
 
 ## Data
 
-`~/.agentry/` holds `agentry.db`, `key`, `hub.json` (port and PID) and `hub.log`. Chat sessions without a project use `~/Agentry/` as their working folder. Removing the repository keeps the data.
+`~/.agentry/` holds `agentry.db`, `key`, `hub.json` (port and PID) and `hub.log`. Chat and group sessions work in `~/Agentry/chat`; projects created by name go in `~/Agentry/projects`. Chat and group conversations show only the model and effort choices and keep each agent's native mode; Code threads show every option the agent reports. Removing the repository keeps the data.

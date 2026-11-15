@@ -75,6 +75,7 @@ const conversations: Conversation[] = [
   ...agents.map((a) => conversation(a.chatId, { title: a.name, memberIds: [a.id] })),
   conversation('g-launch', { kind: 'group', title: 'Launch crew', memberIds: ['claude', 'codex'], leadId: 'claude' }),
   conversation('t-composer', { kind: 'code', title: 'Grow the composer with its text', memberIds: ['claude'], projectId: 'p-agentry' }),
+  conversation('t-links', { kind: 'code', title: 'Fix stale changelog links', memberIds: ['codex'], projectId: 'p-site' }),
 ];
 
 const projects: Project[] = [
@@ -184,6 +185,8 @@ Details are in [the architecture notes](https://agentclientprotocol.com).`),
   message('g-launch', by('claude'), [text('Draft is ready: routines, external agents, and group hop limits.')], 39, { runId: 'run-1' }),
   message('g-launch', by('claude'), [text('@Codex can you check the changelog links?')], 38, { runId: 'run-1', mentions: ['codex'] }),
   message('g-launch', by('codex'), [text('Checked. Two links were stale; both now point at the 0.2 tag.')], 36, { runId: 'run-2' }),
+  message('t-links', user, [text('Two changelog links point at old tags. Fix them.')], 90),
+  message('t-links', by('codex'), [text('Both links now point at the 0.2 tag. No other stale links found.')], 88),
   message('t-composer', user, [text('The composer should grow with the text. Fix it.')], 4),
   message(
     't-composer',
@@ -231,93 +234,140 @@ function refreshConversation(c: Conversation) {
 conversations.forEach(refreshConversation);
 conversations.find((c) => c.id === 't-composer')!.activeRuns = 1;
 
-const claudeOptions: SessionInfo['options'] = [
-  {
-    id: 'mode',
-    name: 'Mode',
-    description: null,
-    category: 'mode',
-    type: 'select',
-    currentValue: 'default',
-    choices: [
-      { value: 'default', name: 'Default', description: 'Ask before edits and commands' },
-      { value: 'acceptEdits', name: 'Accept edits', description: 'Edit files without asking' },
-      { value: 'plan', name: 'Plan', description: 'Read and plan only' },
-      { value: 'auto', name: 'Auto', description: null },
-      { value: 'bypassPermissions', name: 'Bypass permissions', description: 'Never ask' },
-    ],
-  },
-  {
-    id: 'model',
-    name: 'Model',
-    description: null,
-    category: 'model',
-    type: 'select',
-    currentValue: 'opus',
-    choices: [
-      { value: 'opus', name: 'Opus', description: 'Most capable' },
-      { value: 'sonnet', name: 'Sonnet', description: 'Fast and capable' },
-    ],
-  },
-  {
-    id: 'effort',
-    name: 'Effort',
-    description: null,
-    category: 'thought_level',
-    type: 'select',
-    currentValue: 'high',
-    choices: ['low', 'medium', 'high'].map((v) => ({ value: v, name: v, description: null })),
-  },
-];
+type Options = SessionInfo['options'];
 
-const codexOptions: SessionInfo['options'] = [
-  {
-    id: 'mode',
-    name: 'Mode',
-    description: null,
-    category: 'mode',
-    type: 'select',
-    currentValue: 'workspace-write',
-    choices: ['read-only', 'workspace-write', 'agent', 'agent-full-access'].map((v) => ({ value: v, name: v, description: null })),
-  },
-  {
-    id: 'model',
-    name: 'Model',
-    description: null,
-    category: 'model',
-    type: 'select',
-    currentValue: 'gpt-6.1',
-    choices: [
-      { value: 'gpt-6.1', name: 'GPT-6.1', description: null },
-      { value: 'gpt-6.1-mini', name: 'GPT-6.1 mini', description: null },
-    ],
-  },
-  {
-    id: 'reasoning_effort',
-    name: 'Reasoning effort',
-    description: null,
-    category: 'thought_level',
-    type: 'select',
-    currentValue: 'high',
-    choices: ['minimal', 'low', 'medium', 'high'].map((v) => ({ value: v, name: v, description: null })),
-  },
-  { id: 'fast-mode', name: 'Fast mode', description: 'Faster replies, less thinking', category: 'speed', type: 'boolean', currentValue: false },
-];
+const choices = (list: [string, string, string | null][]) => list.map(([value, name, description]) => ({ value, name, description }));
+
+// Chat and group sessions: the hub sends only model and effort.
+const chatOptions: Record<ID, Options> = {
+  claude: [
+    {
+      id: 'model',
+      name: 'Model',
+      description: null,
+      category: 'model',
+      type: 'select',
+      currentValue: 'opus',
+      choices: choices([
+        ['opus', 'Opus', 'Most capable for complex work'],
+        ['sonnet', 'Sonnet', 'Fast and capable for everyday tasks'],
+        ['haiku', 'Haiku', 'Fastest for quick answers'],
+      ]),
+    },
+    {
+      id: 'effort',
+      name: 'Effort',
+      description: null,
+      category: 'thought_level',
+      type: 'select',
+      currentValue: 'high',
+      choices: choices([['low', 'Low', null], ['medium', 'Medium', null], ['high', 'High', null], ['max', 'Max', null]]),
+    },
+  ],
+  codex: [
+    {
+      id: 'model',
+      name: 'Model',
+      description: null,
+      category: 'model',
+      type: 'select',
+      currentValue: 'gpt-6.1-sol',
+      choices: choices([
+        ['gpt-6.1-sol', 'GPT-6.1 Sol', 'Frontier model for long agentic work'],
+        ['gpt-6.1-sol-mini', 'GPT-6.1 Sol Mini', 'Faster and cheaper'],
+      ]),
+    },
+    {
+      id: 'reasoning_effort',
+      name: 'Reasoning effort',
+      description: null,
+      category: 'thought_level',
+      type: 'select',
+      currentValue: 'high',
+      // Lowercase names, as some agents report them; the web app capitalizes for display.
+      choices: choices([['low', 'low', null], ['medium', 'medium', null], ['high', 'high', null], ['xhigh', 'Extra high', null]]),
+    },
+  ],
+};
+
+// Code threads add the access mode and the agent's other options.
+const codeOptions: Record<ID, Options> = {
+  claude: [
+    {
+      id: 'mode',
+      name: 'Mode',
+      description: null,
+      category: 'mode',
+      type: 'select',
+      currentValue: 'default',
+      choices: choices([
+        ['default', 'Default', 'Ask before edits and commands'],
+        ['acceptEdits', 'Accept edits', 'Edit files without asking'],
+        ['plan', 'Plan', 'Read and plan only'],
+        ['bypassPermissions', 'Full access', 'Never ask'],
+      ]),
+    },
+    ...chatOptions.claude,
+  ],
+  codex: [
+    {
+      id: 'mode',
+      name: 'Access',
+      description: null,
+      category: 'mode',
+      type: 'select',
+      currentValue: 'workspace-write',
+      choices: choices([
+        ['read-only', 'Read only', 'Read files; ask before any change'],
+        ['workspace-write', 'Workspace write', 'Edit files in this project; ask before anything else'],
+        ['full-access', 'Full access', 'Edit anywhere and use the network without asking'],
+      ]),
+    },
+    ...chatOptions.codex,
+    {
+      id: 'collaboration_mode',
+      name: 'Collaboration mode',
+      description: null,
+      category: 'collaboration_mode',
+      type: 'select',
+      currentValue: 'default',
+      choices: choices([['default', 'Default', null], ['plan', 'Plan', null]]),
+    },
+    { id: 'fast_mode', name: 'Fast mode', description: 'Faster replies, less thinking', category: 'speed', type: 'boolean', currentValue: false },
+  ],
+};
+
+// Context window use from each conversation's last session; null hides the ring.
+const usage: Record<ID, SessionInfo['usage']> = {
+  'c-claude': { used: 12_400, size: 200_000 },
+  't-composer': { used: 191_000, size: 200_000 },
+  't-links': { used: 172_400, size: 200_000 },
+};
+
+// A visible delay so the not-ready path shows in the fixture; it models no real agent.
+const START_MS = 900;
 
 const sessions = new Map<string, SessionInfo>();
 
 function session(conversationId: ID, agentId: ID): SessionInfo {
   const key = `${conversationId}:${agentId}`;
   if (!sessions.has(key)) {
-    const options = agentId === 'claude' ? claudeOptions : agentId === 'codex' ? codexOptions : [];
-    sessions.set(key, {
+    const code = conversations.find((c) => c.id === conversationId)!.kind === 'code';
+    const s: SessionInfo = {
       conversationId,
       agentId,
-      options: structuredClone(options),
+      options: structuredClone((code ? codeOptions : chatOptions)[agentId] ?? []),
       commands: agentId === 'claude' ? [{ name: 'review', description: 'Review the current changes' }, { name: 'init', description: 'Write CLAUDE.md' }] : [],
-    });
+      usage: usage[conversationId] ?? null,
+      ready: false,
+    };
+    sessions.set(key, s);
+    setTimeout(() => {
+      s.ready = true;
+      emit({ type: 'session.upsert', session: structuredClone(s) });
+    }, START_MS);
   }
-  return sessions.get(key)!;
+  return structuredClone(sessions.get(key)!);
 }
 
 // ---------- Events ----------
@@ -378,14 +428,6 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
-function folders(path: string | null) {
-  if (path === null) return { path: null, parent: null, entries: [{ name: 'Home', path: 'C:\\Users\\dev' }, { name: 'D:', path: 'D:\\' }] };
-  const base = path.endsWith('\\') ? path : `${path}\\`;
-  const depth = path.split('\\').filter(Boolean).length;
-  const names = depth >= 4 ? [] : ['projects', 'notes', 'sandbox'];
-  return { path, parent: depth > 1 ? path.split('\\').slice(0, -1).join('\\') : null, entries: names.map((name) => ({ name, path: base + name })) };
-}
-
 export async function fixtureFetch(url: string, init: RequestInit): Promise<Response> {
   const method = init.method ?? 'GET';
   const body = init.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {};
@@ -433,7 +475,8 @@ export async function fixtureFetch(url: string, init: RequestInit): Promise<Resp
     return json(session(m[1], agentId));
   }
   if ((m = path.match(/^\/api\/conversations\/([^/]+)\/session\/option$/))) {
-    const s = session(m[1], body.agentId as ID);
+    session(m[1], body.agentId as ID);
+    const s = sessions.get(`${m[1]}:${body.agentId as ID}`)!;
     const option = s.options.find((o) => o.id === body.optionId)!;
     option.currentValue = body.value as never;
     emit({ type: 'session.upsert', session: structuredClone(s) });
@@ -480,9 +523,9 @@ export async function fixtureFetch(url: string, init: RequestInit): Promise<Resp
     Object.assign(a, body);
     return json(structuredClone(a));
   }
-  if (method === 'POST' && path === '/api/fs/list') return json(folders(body.path as string | null));
+  if (method === 'POST' && path === '/api/fs/pick-folder') return json({ path: 'D:\\projects\\notes' });
   if (method === 'POST' && path === '/api/projects') {
-    const p = body.path as string;
+    const p = (body.path as string | undefined) ?? `C:\\Users\\dev\\Agentry\\projects\\${body.name as string}`;
     const project: Project = { id: id('p'), name: p.split(/[\\/]/).filter(Boolean).pop()!, path: p, environmentId: 'local', createdAt: new Date().toISOString() };
     projects.push(project);
     return json(project);

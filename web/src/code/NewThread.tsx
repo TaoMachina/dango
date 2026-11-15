@@ -14,7 +14,6 @@ import { useStore } from '../lib/store.ts';
 export function NewThread({ projectId }: { projectId: ID }) {
   const project = useStore((s) => s.projects[projectId]);
   const agents = useStore((s) => s.agents);
-  const collapsed = useStore((s) => s.ui.listCollapsed);
   const wide = useMedia(WIDE_LIST);
   const choices = useMemo(
     () => Object.values(agents).filter((a) => a.source === 'acp').sort((a, b) => Number(a.hidden) - Number(b.hidden) || a.name.localeCompare(b.name)),
@@ -39,7 +38,7 @@ export function NewThread({ projectId }: { projectId: ID }) {
 
   return (
     <div className="flex h-full flex-col">
-      {(!wide || collapsed) && (
+      {!wide && (
         <div className="flex h-14 items-center px-3">
           <MenuToggle />
         </div>
@@ -48,14 +47,14 @@ export function NewThread({ projectId }: { projectId: ID }) {
         <h2 className="mb-6 text-center text-[22px] font-semibold">What should we build in {project?.name}?</h2>
         <div className="w-full max-w-2xl">
           <ComposerBox value={text} onChange={setText} onSubmit={submit} placeholder="Describe the task" autoFocus busy={busy || !agent} />
-          <div className="flex items-center px-2 pt-1.5">
+          <div className="mt-1.5 flex items-center px-[7px]">
             <button
               ref={picker.anchor}
               type="button"
               aria-label={`Agent: ${agent?.name ?? 'none'}`}
               aria-expanded={picker.open !== null}
               onClick={() => picker.setOpen(picker.open ? null : 'open')}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full px-2 text-[13px] text-muted hover:bg-hover hover:text-fg"
+              className="inline-flex h-7 items-center gap-1.5 rounded-full pl-1 pr-2.5 text-[13px] text-muted transition-colors hover:bg-hover hover:text-fg aria-expanded:bg-hover aria-expanded:text-fg"
             >
               {agent ? (
                 <>
@@ -65,7 +64,7 @@ export function NewThread({ projectId }: { projectId: ID }) {
               ) : (
                 'No agents can code here'
               )}
-              <ChevronDown size={13} />
+              <ChevronDown size={12} className="opacity-70" />
             </button>
             {picker.open && (
               <Popover anchor={picker.anchor} onClose={picker.close} label="Agent" width={260}>

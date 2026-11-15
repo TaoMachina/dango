@@ -3,7 +3,6 @@ import type {
   Avatar,
   Conversation,
   CreateConversationRequest,
-  FsListResponse,
   ID,
   Message,
   Project,
@@ -11,6 +10,7 @@ import type {
   Run,
   Schedule,
   SessionInfo,
+  SessionOption,
   StateResponse,
 } from '../../../shared/types.ts';
 import { api } from './api.ts';
@@ -165,8 +165,16 @@ export async function openSession(conversationId: ID, agentId: ID) {
   storeSession(await api<SessionInfo>('POST', `/api/conversations/${conversationId}/session`, { agentId }));
 }
 
+/** Shows the new value at once, then stores the hub's answer; a rejected change restores the previous session. */
 export async function setSessionOption(conversationId: ID, agentId: ID, optionId: string, value: string | boolean) {
-  storeSession(await api<SessionInfo>('POST', `/api/conversations/${conversationId}/session/option`, { agentId, optionId, value }));
+  const previous = getState().sessions[sessionKey(conversationId, agentId)];
+  storeSession({ ...previous, options: previous.options.map((o) => (o.id === optionId ? ({ ...o, currentValue: value } as SessionOption) : o)) });
+  try {
+    storeSession(await api<SessionInfo>('POST', `/api/conversations/${conversationId}/session/option`, { agentId, optionId, value }));
+  } catch (error) {
+    storeSession(previous);
+    throw error;
+  }
 }
 
 // ---------- Agents ----------
@@ -215,12 +223,14 @@ export async function deleteConversation(id: ID) {
 
 // ---------- Projects ----------
 
-export function listFolders(path: string | null) {
-  return api<FsListResponse>('POST', '/api/fs/list', { path });
+/** Opens the operating system's folder dialog on this computer. Null when the person cancels. */
+export async function pickFolder() {
+  return (await api<{ path: string | null }>('POST', '/api/fs/pick-folder')).path;
 }
 
-export async function createProject(path: string) {
-  const project = await api<Project>('POST', '/api/projects', { path });
+/** `path` adds an existing folder; `name` creates ~/Agentry/projects/<name>. */
+export async function createProject(body: { path: string } | { name: string }) {
+  const project = await api<Project>('POST', '/api/projects', body);
   upsert('projects', project);
   return project;
 }

@@ -12,8 +12,8 @@ import { openDb } from './db.ts';
 import { Events } from './events.ts';
 import { External, helloSchema, MAX_WAIT_SECONDS, postSchema, replySchema } from './external.ts';
 import { dispatch, parse, Router, sendJson } from './http.ts';
-import { codeTaskSchema, messageToolSchema, routineToolSchema, ToolTokens, Tools } from './mcp/tools.ts';
-import { defaultWorkDir, hubPaths } from './paths.ts';
+import { codeTaskSchema, messageToolSchema, readThreadSchema, routineToolSchema, ToolTokens, Tools } from './mcp/tools.ts';
+import { defaultWorkDir, hubPaths, projectsDir } from './paths.ts';
 import { HttpError } from './projects.ts';
 import { Routines } from './routines.ts';
 import { Runs } from './routing.ts';
@@ -26,7 +26,8 @@ export interface HubOptions {
   home?: string;
   port: number;
   catalog?: CatalogEntry[];
-  workDir?: string;
+  // The folder that holds Agentry/chat and Agentry/projects; tests pass a temporary one.
+  userHome?: string;
   // null: serve only the API (development, where Vite serves the web app).
   webDist?: string | null;
   onShutdown?: () => void;
@@ -56,7 +57,7 @@ export async function createHub(options: HubOptions) {
   const tools = new Tools(store, events, runs, routines);
   const external = new External(store, events, runs, hubUrl);
   const acp = new AcpHost({
-    store, events, runs, catalog, tools: tokens, workDir: options.workDir ?? defaultWorkDir(), bridgePath: join(serverDir, 'mcp', 'bridge.ts'), hubUrl,
+    store, events, runs, catalog, tools: tokens, workDir: defaultWorkDir(options.userHome), bridgePath: join(serverDir, 'mcp', 'bridge.ts'), hubUrl,
   });
   runs.executors = { acp, external };
   rescan(store, events, catalog);
@@ -76,13 +77,14 @@ export async function createHub(options: HubOptions) {
     return closing;
   };
 
-  const api = apiRoutes({ store, events, runs, acp, external, routines, catalog, shutdown: options.onShutdown ?? (() => void close()) });
+  const api = apiRoutes({ store, events, runs, acp, external, routines, catalog, projectsDir: projectsDir(options.userHome), shutdown: options.onShutdown ?? (() => void close()) });
 
   type ToolCaller = { agentId: string; conversationId: string };
   const toolApi = new Router<ToolCaller>()
     .on('GET', '/tool-api/conversation', c => tools.conversation(c.caller))
     .on('GET', '/tool-api/projects', () => tools.projects())
     .on('POST', '/tool-api/code-task', c => tools.startCodeTask(c.caller, parse(codeTaskSchema, c.body)))
+    .on('POST', '/tool-api/code-thread', c => tools.readCodeThread(parse(readThreadSchema, c.body)))
     .on('POST', '/tool-api/routines', c => tools.createRoutine(c.caller, parse(routineToolSchema, c.body)))
     .on('POST', '/tool-api/messages', c => tools.sendMessage(c.caller, parse(messageToolSchema, c.body)));
 
@@ -149,7 +151,7 @@ export async function createHub(options: HubOptions) {
   port = (server.address() as { port: number }).port;
   routines.arm();
 
-  return { url: hubUrl(), port, key, paths, store, runs, close };
+  return { url: hubUrl(), port, key, paths, store, runs, tools, close };
 }
 
 export type Hub = Awaited<ReturnType<typeof createHub>>;

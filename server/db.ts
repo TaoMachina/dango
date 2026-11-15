@@ -106,6 +106,27 @@ const migrations: string[] = [
     created_at TEXT NOT NULL
   );
   `,
+  `
+  -- Last session settings each agent reported, shown at once while a new session starts.
+  CREATE TABLE agent_session_cache (
+    agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+    config_options TEXT NOT NULL,
+    modes TEXT,
+    commands TEXT NOT NULL
+  );
+  -- Option values chosen per conversation, reapplied to every new or restored session.
+  CREATE TABLE session_choices (
+    agent_id TEXT NOT NULL,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    option_id TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (agent_id, conversation_id, option_id)
+  );
+  -- Context window use of the stored session.
+  ALTER TABLE acp_sessions ADD COLUMN usage TEXT;
+  -- A code thread started with agentry_start_code_task reports each finished run to the conversation that asked for it.
+  ALTER TABLE conversations ADD COLUMN requested_from TEXT REFERENCES conversations(id) ON DELETE SET NULL;
+  `,
 ];
 
 export function openDb(file: string): DatabaseSync {

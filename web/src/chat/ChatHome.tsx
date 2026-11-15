@@ -12,7 +12,6 @@ import { AddAgentForm } from './AddAgentForm.tsx';
 /** Chat with nothing selected: the agent roster, or a way to add the first agent. */
 export function ChatHome() {
   const agents = useStore((s) => s.agents);
-  const collapsed = useStore((s) => s.ui.listCollapsed);
   const wide = useMedia(WIDE_LIST);
   const roster = useMemo(() => Object.values(agents).filter((a) => !a.hidden).sort((a, b) => a.name.localeCompare(b.name)), [agents]);
   const addRef = useRef<HTMLButtonElement>(null);
@@ -21,7 +20,7 @@ export function ChatHome() {
 
   return (
     <div className="flex h-full flex-col">
-      {(!wide || collapsed) && (
+      {!wide && (
         <div className="flex h-14 items-center px-3">
           <MenuToggle />
         </div>

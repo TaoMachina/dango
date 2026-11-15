@@ -169,8 +169,13 @@ export type SessionOption =
 export interface SessionInfo {
   conversationId: ID;
   agentId: ID;
-  options: SessionOption[]; // show 'model' first, then 'mode', then the rest
+  // The options this conversation exposes, already filtered by the hub:
+  // chat and group conversations get only 'model' and 'thought_level' (chats are read-only;
+  // coding work goes to Code). Code threads get model, thought_level, mode and the rest.
+  options: SessionOption[];
   commands: { name: string; description: string }[]; // agent slash commands
+  usage: { used: number; size: number } | null; // context window tokens from ACP usage_update
+  ready: boolean; // false while the agent process or session is still starting; options then come from the agent's last session
 }
 
 // ---------- Routines ----------
@@ -210,7 +215,7 @@ export interface StateResponse {
 // POST   /api/conversations                           CreateConversationRequest -> Conversation
 // PATCH  /api/conversations/:id                       { title?, avatar?, memberIds?, leadId?, hopLimit? } -> Conversation
 // DELETE /api/conversations/:id                       -> {} (groups and code threads only)
-// POST   /api/conversations/:id/session               { agentId } -> SessionInfo (starts the agent and its session if needed)
+// POST   /api/conversations/:id/session               { agentId } -> SessionInfo (answers at once; starts the agent and its session in the background and sends session.upsert when ready)
 // POST   /api/conversations/:id/session/option        { agentId, optionId, value: string | boolean } -> SessionInfo
 // POST   /api/permissions/:requestId                  { optionId } | { cancel: true } -> {}
 // PATCH  /api/agents/:id                              { name?, avatar?, description?, hidden? } -> Agent
@@ -218,9 +223,11 @@ export interface StateResponse {
 // POST   /api/agents/external                         { name } -> { agent: Agent; instruction: string }
 // POST   /api/agents/:id/instruction                  -> { instruction: string } (external agents; issues a new token)
 // DELETE /api/agents/:id                              -> {} (external agents only)
-// POST   /api/projects                                { path, name? } -> Project (creates the folder if missing)
+// POST   /api/projects                                { path } | { name } -> Project
+//                                                     path: an existing folder (from /api/fs/pick-folder)
+//                                                     name: creates ~/Agentry/projects/<name>
 // DELETE /api/projects/:id                            -> {}
-// POST   /api/fs/list                                 { path: string | null } -> FsListResponse (null = home and drives)
+// POST   /api/fs/pick-folder                          -> { path: string | null } (opens the operating system's folder dialog on this computer; null when cancelled)
 // POST   /api/routines                                { conversationId, agentId, title, prompt, schedule } -> Routine
 // PATCH  /api/routines/:id                            { title?, prompt?, schedule?, enabled? } -> Routine
 // DELETE /api/routines/:id                            -> {}
@@ -234,11 +241,6 @@ export type CreateConversationRequest =
   | { kind: 'group'; title: string; memberIds: ID[]; leadId?: ID }
   | { kind: 'code'; projectId: ID; agentId: ID; title?: string };
 
-export interface FsListResponse {
-  path: string | null;
-  parent: string | null;
-  entries: { name: string; path: string }[]; // folders only
-}
 
 export interface ApiError { error: string }
 

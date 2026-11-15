@@ -45,7 +45,7 @@ export function CodeList() {
           <FolderPlus size={18} />
         </IconButton>
         {add.open && (
-          <Popover anchor={add.anchor} onClose={add.close} label="New project" width={380} align="end">
+          <Popover anchor={add.anchor} onClose={add.close} label="New project" width={300} align="end">
             <NewProjectForm
               onDone={(project) => {
                 add.close();

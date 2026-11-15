@@ -7,7 +7,7 @@ import { MenuToggle } from '../components/MenuToggle.tsx';
 import { IconButton } from '../components/ui.tsx';
 import { openSession, patchAgent, patchConversation, togglePanel } from '../lib/actions.ts';
 import { conversationAvatar, conversationTitle, primaryAgent } from '../lib/display.ts';
-import { useMedia, WIDE_LIST, WIDE_PANEL } from '../lib/media.ts';
+import { useMedia, WIDE_PANEL } from '../lib/media.ts';
 import { useStore } from '../lib/store.ts';
 import { Composer } from './Composer.tsx';
 import { MessageList } from './MessageList.tsx';
@@ -15,9 +15,7 @@ import { MessageList } from './MessageList.tsx';
 function Header({ conversation }: { conversation: Conversation }) {
   const agents = useStore((s) => s.agents);
   const project = useStore((s) => (conversation.projectId ? s.projects[conversation.projectId] : undefined));
-  const listCollapsed = useStore((s) => s.ui.listCollapsed);
   const panelOpen = useStore((s) => s.ui.panelOpen);
-  const wideList = useMedia(WIDE_LIST);
   const widePanel = useMedia(WIDE_PANEL);
   const agent = primaryAgent(conversation, agents);
   const title = conversationTitle(conversation, agents);
@@ -25,7 +23,7 @@ function Header({ conversation }: { conversation: Conversation }) {
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-3">
-      {(!wideList || listCollapsed) && <MenuToggle />}
+      <MenuToggle />
       <Avatar avatar={conversationAvatar(conversation, agents)} size={26} />
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         <div className="flex min-w-0 items-baseline gap-2">

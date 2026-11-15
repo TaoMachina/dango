@@ -185,17 +185,18 @@ function GroupPanel({ conversation }: { conversation: Conversation }) {
             );
           })}
         </ul>
-        <div className="mt-2 flex items-center justify-between px-2 py-1.5 text-[14px]">
-          <span id="hop-label">
-            Hop limit
-            <span className="block text-[12px] text-muted">Agent-to-agent mentions per request</span>
+        <p className="px-2 pt-1 text-[12px] text-muted">Messages go to the lead. @name to ask someone else.</p>
+        <div className="mt-2 flex items-center justify-between gap-3 px-2 py-1.5 text-[14px]">
+          <span className="min-w-0">
+            <span id="handoff-label" className="block">Agent handoffs</span>
+            <span id="handoff-help" className="block text-[12px] leading-4 text-muted">How many times agents can pass one message on to each other with @</span>
           </span>
-          <div className="flex items-center gap-1" role="group" aria-labelledby="hop-label">
-            <IconButton label="Fewer hops" className="size-7" disabled={conversation.hopLimit <= 0} onClick={() => void patchConversation(conversation.id, { hopLimit: conversation.hopLimit - 1 })}>
+          <div className="flex shrink-0 items-center gap-1" role="group" aria-labelledby="handoff-label" aria-describedby="handoff-help">
+            <IconButton label="Fewer handoffs" className="size-7" disabled={conversation.hopLimit <= 0} onClick={() => void patchConversation(conversation.id, { hopLimit: conversation.hopLimit - 1 })}>
               <Minus size={14} />
             </IconButton>
             <span className="w-5 text-center tabular-nums">{conversation.hopLimit}</span>
-            <IconButton label="More hops" className="size-7" onClick={() => void patchConversation(conversation.id, { hopLimit: conversation.hopLimit + 1 })}>
+            <IconButton label="More handoffs" className="size-7" onClick={() => void patchConversation(conversation.id, { hopLimit: conversation.hopLimit + 1 })}>
               <Plus size={14} />
             </IconButton>
           </div>
