@@ -178,13 +178,27 @@ export class LiveRun {
     this.runs.emitConversation(this.conversation.id);
     this.runs.emitAgent(this.agent.id);
     this.runs.reportToRequester(this.conversation, this.agent, status);
-    // An agent's @mention hands work to that member, up to the group's hop limit.
     const conversation = store.getConversation(this.conversation.id);
-    if (status === 'done' && message && conversation && this.run.depth + 1 <= conversation.hopLimit) {
-      for (const agentId of mentions) {
-        this.runs.startRun({ conversationId: conversation.id, agentId, triggerMessageId: message.id, parentRunId: this.run.id, depth: this.run.depth + 1 });
+    if (status !== 'done' || !message || !conversation || conversation.kind !== 'group') return;
+    const withinLimit = this.run.depth + 1 <= conversation.hopLimit;
+    // An agent's @mention hands work to that member, up to the group's hop limit.
+    if (mentions.length > 0) {
+      if (withinLimit) {
+        for (const agentId of mentions) {
+          this.runs.startRun({ conversationId: conversation.id, agentId, triggerMessageId: message.id, parentRunId: this.run.id, depth: this.run.depth + 1 });
+        }
+      } else {
+        const names = mentions.map(id => `@${store.getAgent(id)?.name}`).join(', ');
+        this.runs.postMessage(conversation.id, { type: 'system' }, `Handoff limit reached, so ${names} was not asked. Send a message to continue.`);
       }
+      return;
     }
+    // A member the lead asked has answered: once every member from that handoff is done, the lead reviews and replies to the person.
+    const parent = this.run.parentRunId ? store.getRun(this.run.parentRunId) : null;
+    const lead = conversation.leadId ?? conversation.memberIds[0];
+    if (!parent || parent.agentId !== lead || this.agent.id === lead || !withinLimit) return;
+    if (store.childRuns(parent.id).some(r => r.status === 'queued' || r.status === 'running')) return;
+    this.runs.startRun({ conversationId: conversation.id, agentId: lead, triggerMessageId: message.id, parentRunId: this.run.id, depth: this.run.depth + 1 });
   }
 }
 

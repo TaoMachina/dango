@@ -91,7 +91,18 @@ export function SessionControls({ conversationId, agentId }: { conversationId: I
   );
 }
 
-function ModelPicker({ model, effort, more, set }: { model?: Select; effort?: Select; more: SessionOption[]; set: SetOption }) {
+/** One member's model and effort in a group: the same picker, for that member's session in this group. */
+export function MemberModelPicker({ conversationId, agentId }: { conversationId: ID; agentId: ID }) {
+  const session = useStore((s) => s.sessions[sessionKey(conversationId, agentId)]);
+  if (!session) return null;
+  const model = session.options.find((o) => isSelect(o, 'model')) as Select | undefined;
+  const effort = session.options.find((o) => isSelect(o, 'thought_level')) as Select | undefined;
+  if (!model && !effort) return null;
+  const set: SetOption = (id, value) => void setSessionOption(conversationId, agentId, id, value);
+  return <ModelPicker model={model} effort={effort} more={[]} set={set} compact />;
+}
+
+function ModelPicker({ model, effort, more, set, compact }: { model?: Select; effort?: Select; more: SessionOption[]; set: SetOption; compact?: boolean }) {
   const pop = usePopover();
   const modelName = model && shortModel(current(model)?.name ?? model.currentValue);
   const effortChoice = effort && current(effort);
@@ -106,13 +117,14 @@ function ModelPicker({ model, effort, more, set }: { model?: Select; effort?: Se
         aria-label={`Model and effort: ${summary}`}
         aria-expanded={pop.open !== null}
         onClick={() => pop.setOpen(pop.open ? null : 'open')}
-        className={pillClass}
+        // In the member list the pill sits under the name, so it drops its side padding to line up with it.
+        className={compact ? `${pillClass} -ml-2 h-6 px-2 text-[12px]` : pillClass}
       >
         <span className="truncate">{summary}</span>
         <ChevronDown size={12} className="shrink-0 opacity-70" />
       </button>
       {pop.open && (
-        <Popover anchor={pop.anchor} onClose={pop.close} label="Model" width={320}>
+        <Popover anchor={pop.anchor} onClose={pop.close} label="Model" width={320} align={compact ? 'end' : undefined}>
           {model && <ModelList model={model} set={set} />}
           {effort && (
             <div className={`px-3 pb-3 pt-2.5 ${model ? 'border-t border-line' : ''}`}>

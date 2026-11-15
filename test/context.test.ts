@@ -33,7 +33,8 @@ test('the context tells the lead it takes unmentioned messages and a member how 
   assert.match(lead, /You are the lead\. Messages without an @mention come to you\./);
   assert.match(lead, /stop after 3 in a row/);
   const member = sessionContext(group(one.id), two, [one, two], null);
-  assert.match(member, /The lead is @One\. You were asked by @mention\. Write @Name to pass work on\./);
+  assert.match(member, /The lead is @One\. When you are asked, do your part[\s\S]*the lead is told when you finish/);
+  assert.ok(member.includes('agentry_start_code_task'), 'group members know their tools');
   assert.doesNotMatch(member, /You are the lead/);
 });
 

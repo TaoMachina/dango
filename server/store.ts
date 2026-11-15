@@ -214,6 +214,10 @@ export class Store {
     return this.getRun(id)!;
   }
 
+  childRuns(parentRunId: ID) {
+    return this.db.prepare('SELECT * FROM runs WHERE parent_run_id = ?').all(parentRunId).map(r => this.runFrom(r as Row));
+  }
+
   hasRuns(conversationId: ID, agentId: ID): boolean {
     return this.count('SELECT COUNT(*) AS n FROM runs WHERE conversation_id = ? AND agent_id = ?', conversationId, agentId) > 0;
   }

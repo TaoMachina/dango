@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import type { Conversation, ID } from '../../../shared/types.ts';
+import type { Agent, Conversation, ID } from '../../../shared/types.ts';
 import { Avatar } from '../components/Avatar.tsx';
 import { sendMessage, stop } from '../lib/actions.ts';
 import { conversationTitle, primaryAgent } from '../lib/display.ts';
@@ -114,6 +114,29 @@ export function Composer({ conversation }: { conversation: Conversation }) {
         autoFocus={finePointer}
       />
       {agent && <SessionControls conversationId={conversation.id} agentId={agent.id} />}
+      {group && <Recipients conversation={conversation} members={members} text={text} />}
     </div>
+  );
+}
+
+// Says who will answer before the message is sent: the @mentioned members, else the lead.
+function Recipients({ conversation, members, text }: { conversation: Conversation; members: Agent[]; text: string }) {
+  const lower = text.toLowerCase();
+  const named = members.filter((m) => lower.includes(`@${m.name.toLowerCase()}`));
+  const lead = members.find((m) => m.id === (conversation.leadId ?? conversation.memberIds[0]));
+  const to = named.length > 0 ? named : lead ? [lead] : [];
+  if (to.length === 0) return null;
+  return (
+    // 7px matches the composer's border and padding, like the session controls in chats.
+    <p className="mt-1.5 flex h-7 items-center gap-1.5 px-[7px] text-[13px] text-muted">
+      To
+      {to.map((m) => (
+        <span key={m.id} className="inline-flex items-center gap-1 text-fg">
+          <Avatar avatar={m.avatar} size={16} />
+          {m.name}
+        </span>
+      ))}
+      {named.length === 0 && <span>· lead</span>}
+    </p>
   );
 }

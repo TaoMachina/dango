@@ -1,11 +1,12 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { MemberModelPicker } from '../conversation/SessionPickers.tsx';
 import { Crown, FileDiff, Minus, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import type { Avatar as AvatarData, Conversation, ID } from '../../../shared/types.ts';
 import { Avatar } from '../components/Avatar.tsx';
 import { EditableText } from '../components/EditableText.tsx';
 import { Popover, usePopover } from '../components/Popover.tsx';
 import { Button, IconButton, MenuItem, SectionTitle, Switch } from '../components/ui.tsx';
-import { deleteConversation, patchAgent, patchConversation } from '../lib/actions.ts';
+import { deleteConversation, openSession, patchAgent, patchConversation } from '../lib/actions.ts';
 import { conversationAvatar, primaryAgent, STATUS_COLOR, STATUS_LABEL } from '../lib/display.ts';
 import { updateUI, useStore } from '../lib/store.ts';
 import { AvatarPicker } from './AvatarPicker.tsx';
@@ -131,6 +132,11 @@ function GroupPanel({ conversation }: { conversation: Conversation }) {
   const agents = useStore((s) => s.agents);
   const add = usePopover();
   const others = useMemo(() => Object.values(agents).filter((a) => !conversation.memberIds.includes(a.id)), [agents, conversation.memberIds]);
+  // Each member keeps its own session in this group; loading them shows each member's model and effort.
+  const memberKey = conversation.memberIds.join(',');
+  useEffect(() => {
+    for (const id of conversation.memberIds) void openSession(conversation.id, id);
+  }, [conversation.id, memberKey]);
 
   return (
     <>
@@ -175,17 +181,36 @@ function GroupPanel({ conversation }: { conversation: Conversation }) {
           {conversation.memberIds.map((id) => {
             const agent = agents[id];
             if (!agent) return null;
+            const isLead = conversation.leadId === id;
             return (
-              <li key={id} className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-hover">
-                <Avatar avatar={agent.avatar} size={30} />
-                <span className="min-w-0 flex-1 truncate text-[14px]">{agent.name}</span>
-                {conversation.leadId === id && <span className="text-[12px] text-muted">Lead</span>}
+              <li key={id} className="group/member flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-hover">
+                <Avatar avatar={agent.avatar} size={32} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px]">{agent.name}</span>
+                  <MemberModelPicker conversationId={conversation.id} agentId={id} />
+                </span>
+                {isLead ? (
+                  <span className="inline-flex h-7 items-center gap-1 rounded-full bg-field px-2.5 text-[12px]" title="Messages without an @mention go to the lead">
+                    <Crown size={13} />
+                    Lead
+                  </span>
+                ) : (
+                  // Shown on hover or keyboard focus, at the spot where the lead badge sits, so switching is one click.
+                  <IconButton
+                    label={`Make ${agent.name} the lead`}
+                    title="Make lead"
+                    className="size-7 opacity-0 focus-visible:opacity-100 group-hover/member:opacity-100"
+                    onClick={() => void patchConversation(conversation.id, { leadId: id })}
+                  >
+                    <Crown size={15} />
+                  </IconButton>
+                )}
                 <MemberMenu conversation={conversation} id={id} />
               </li>
             );
           })}
         </ul>
-        <p className="px-2 pt-1 text-[12px] text-muted">Messages go to the lead. @name to ask someone else.</p>
+        <p className="px-2 pt-1 text-[12px] text-muted">Messages go to the lead, who hands work to others and sums up. @name to ask someone directly.</p>
         <div className="mt-2 flex items-center justify-between gap-3 px-2 py-1.5 text-[14px]">
           <span className="min-w-0">
             <span id="handoff-label" className="block">Agent handoffs</span>
