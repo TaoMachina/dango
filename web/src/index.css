@@ -1,0 +1,169 @@
+@import "tailwindcss" source(".");
+
+@theme {
+  --font-sans: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", -apple-system, "SF Pro Text", BlinkMacSystemFont, Inter, system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-sidebar: var(--sidebar);
+  --color-line: var(--line);
+  --color-bubble: var(--bubble);
+  --color-bubble-user: var(--bubble-user);
+  --color-hover: var(--hover);
+  --color-selected: var(--selected);
+  --color-field: var(--field);
+  --color-code: var(--code);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warn: var(--warn);
+  --color-add: var(--add);
+  --color-add-bg: var(--add-bg);
+  --color-del: var(--del);
+  --color-del-bg: var(--del-bg);
+  --color-overlay: var(--overlay);
+}
+
+:root {
+  --bg: #ffffff;
+  --fg: #111111;
+  --muted: #8a8a8a;
+  --faint: #b4b4b4;
+  --sidebar: #f7f7f7;
+  --line: #ececec;
+  --bubble: #f2f2f3;
+  --bubble-user: #e6e6e9;
+  --hover: rgb(0 0 0 / 0.04);
+  --selected: #ebebec;
+  --field: #efeff0;
+  --code: #e8e8ea;
+  --accent: #111111;
+  --accent-fg: #ffffff;
+  --danger: #d93a3a;
+  --success: #2f9e5b;
+  --warn: #b7791f;
+  --add: #1a7f37;
+  --add-bg: #e8f6ec;
+  --del: #c4302b;
+  --del-bg: #fdecec;
+  --overlay: rgb(0 0 0 / 0.28);
+  --focus: #3b82f6;
+  --shadow: 0 8px 30px rgb(0 0 0 / 0.1), 0 1px 3px rgb(0 0 0 / 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f10;
+    --fg: #ececec;
+    --muted: #8e8e93;
+    --faint: #5c5c61;
+    --sidebar: #161617;
+    --line: #262628;
+    --bubble: #1e1e20;
+    --bubble-user: #2b2b2f;
+    --hover: rgb(255 255 255 / 0.05);
+    --selected: #242426;
+    --field: #1e1e20;
+    --code: #2a2a2d;
+    --accent: #f2f2f2;
+    --accent-fg: #111111;
+    --danger: #f06262;
+    --success: #4cc782;
+    --warn: #e0a84a;
+    --add: #6fd88f;
+    --add-bg: #12301d;
+    --del: #ff8a80;
+    --del-bg: #3a1716;
+    --overlay: rgb(0 0 0 / 0.55);
+    --focus: #60a5fa;
+    --shadow: 0 8px 30px rgb(0 0 0 / 0.5), 0 0 0 1px #2a2a2d;
+  }
+}
+
+/* Base rules sit in Tailwind's base layer so utilities such as focus-visible:outline-none override them. */
+@layer base {
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+button,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+} /* @layer base */
+
+.shadow-pop {
+  box-shadow: var(--shadow);
+}
+
+@keyframes pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+.animate-pop {
+  animation: pop 260ms ease-out;
+}
+
+@keyframes typing {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+
+.typing-dot {
+  animation: typing 1.2s infinite;
+}
+
+@keyframes flash {
+  from { background: var(--selected); }
+  to { background: transparent; }
+}
+
+.animate-flash {
+  animation: flash 1.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
