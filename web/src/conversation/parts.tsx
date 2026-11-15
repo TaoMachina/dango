@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   AlertCircle,
   ArrowRightLeft,
+  Bot,
   Brain,
   Check,
   ChevronRight,
@@ -20,6 +21,7 @@ import type { Part, ToolContent } from '../../../shared/types.ts';
 import { DiffView } from '../components/DiffView.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { Spinner } from '../components/ui.tsx';
+import { LIVE_STATE } from '../code/workLog.ts';
 import { answerPermission } from '../lib/actions.ts';
 
 type PartOf<T extends Part['type']> = Extract<Part, { type: T }>;
@@ -153,6 +155,21 @@ export function PermissionPart({ part }: { part: PartOf<'permission'> }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** A subagent in a chat: its title, latest step and state, in the same quiet line as a tool call. */
+export function SubagentPart({ part }: { part: PartOf<'subagent'> }) {
+  const line = part.activity ?? part.description;
+  return (
+    <div className="flex w-full max-w-[min(85%,640px)] items-center gap-2 px-1 py-1 text-[13px] text-muted">
+      <Bot size={14} className="shrink-0" />
+      <span className="min-w-0 flex-1 truncate">
+        <span className="text-fg/80">{part.title ?? 'Subagent'}</span>
+        {line && <span className="ml-2">{line}</span>}
+      </span>
+      {part.state === 'running' ? <Spinner size={13} /> : <span className="shrink-0 text-[12px]">{LIVE_STATE[part.state].label}</span>}
     </div>
   );
 }

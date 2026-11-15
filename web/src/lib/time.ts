@@ -17,3 +17,17 @@ export function relativeTime(iso: string) {
 export function fullTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
+
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+
+/** Message time after T3 Code: "just now", "5 min ago", "2 h ago" within a day, then a date. */
+export function agoTime(iso: string, now: number) {
+  const date = new Date(iso);
+  const diff = now - date.getTime();
+  if (diff < MINUTE) return 'just now';
+  if (diff < HOUR) return `${Math.floor(diff / MINUTE)} min ago`;
+  if (diff < DAY) return `${Math.floor(diff / HOUR)} h ago`;
+  const sameYear = date.getFullYear() === new Date(now).getFullYear();
+  return date.toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'short', day: 'numeric' });
+}

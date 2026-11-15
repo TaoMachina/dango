@@ -21,21 +21,27 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import type { Message, Run, ToolContent } from '../../../shared/types.ts';
+import type { Agent, ID, Message, Run, ToolContent } from '../../../shared/types.ts';
+import { Avatar } from '../components/Avatar.tsx';
 import { DiffView } from '../components/DiffView.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { Spinner } from '../components/ui.tsx';
+import { MessageMeta } from '../conversation/MessageActions.tsx';
 import { ErrorPart, ImagePart } from '../conversation/parts.tsx';
-import { answerPermission } from '../lib/actions.ts';
+import { answerPermission, select } from '../lib/actions.ts';
+import { updateUI, useStore } from '../lib/store.ts';
 import { fullTime } from '../lib/time.ts';
 import {
   isActive,
+  LIVE_STATE,
+  liveTitle,
   messageRows,
   relativePath,
   subagentDetail,
   summarize,
   toolTitle,
   type Entry,
+  type LiveSubagent,
   type PermissionPartData,
   type PlanPart,
   type Subagent,
@@ -191,6 +197,49 @@ export function SubagentRow({ agent, context, streaming }: { agent: Subagent; co
   );
 }
 
+/** The subagent's face: the Agentry agent's avatar when another agent acts as it, else a bot mark; a dot shows its state. */
+export function LiveSubagentFace({ part, agent, size }: { part: LiveSubagent; agent: Agent | undefined; size: number }) {
+  return (
+    <span className="relative flex shrink-0 items-center justify-center" style={{ width: size, height: size }} aria-hidden>
+      {agent ? <Avatar avatar={agent.avatar} size={size} /> : <Bot size={Math.round(size * 0.75)} />}
+      <span className={`absolute -bottom-px -right-px size-1.5 rounded-full ring-2 ring-bg ${LIVE_STATE[part.state].dot}`} />
+    </span>
+  );
+}
+
+/** "Open" for a subagent that has its own thread in Agentry. */
+export function OpenThreadButton({ conversationId }: { conversationId: ID }) {
+  return (
+    <button type="button" onClick={() => select('code', conversationId)} className="h-6 shrink-0 rounded-md px-1.5 text-[12px] text-muted hover:bg-hover hover:text-fg">
+      Open
+    </button>
+  );
+}
+
+function LiveSubagentRow({ part, live }: { part: LiveSubagent; live: boolean }) {
+  const agent = useStore((s) => (part.agentId ? s.agents[part.agentId] : undefined));
+  const line = part.activity ?? part.description;
+  return (
+    <WorkLine
+      icon={<LiveSubagentFace part={part} agent={agent} size={14} />}
+      label={
+        <>
+          {liveTitle(part, agent?.name)}
+          {line && <span className="ml-2 text-muted">{line}</span>}
+        </>
+      }
+      live={live}
+      trailing={
+        <>
+          {part.model && <span className="max-w-32 shrink-0 truncate text-[12px] text-faint">{part.model}</span>}
+          {!live && <span className="shrink-0 text-[12px] text-muted">{LIVE_STATE[part.state].label}</span>}
+          {part.conversationId && <OpenThreadButton conversationId={part.conversationId} />}
+        </>
+      }
+    />
+  );
+}
+
 function EntryRow({ entry, live, streaming, context }: { entry: Entry; live: boolean; streaming: boolean; context: TimelineContext }) {
   switch (entry.kind) {
     case 'tool':
@@ -199,23 +248,27 @@ function EntryRow({ entry, live, streaming, context }: { entry: Entry; live: boo
       return <ThoughtRow text={entry.text} live={live} />;
     case 'subagent':
       return <SubagentRow agent={entry.agent} context={context} streaming={streaming} />;
+    case 'live':
+      return <LiveSubagentRow part={entry.part} live={live} />;
   }
 }
 
 function entryKey(entry: Entry, index: number) {
   if (entry.kind === 'tool') return entry.part.toolCallId;
   if (entry.kind === 'subagent') return `subagent-${entry.agent.key}`;
+  if (entry.kind === 'live') return `live-${entry.part.sessionId}`;
   return `thought-${index}`;
 }
 
 function entryIcon(entry: Entry) {
-  if (entry.kind === 'subagent') return Bot;
+  if (entry.kind === 'subagent' || entry.kind === 'live') return Bot;
   if (entry.kind === 'thought') return Brain;
   return KIND_ICON[entry.part.kind] ?? Wrench;
 }
 
-function entryLabel(entry: Entry, context: TimelineContext) {
+function entryLabel(entry: Entry, context: TimelineContext, agents: Record<ID, Agent>) {
   if (entry.kind === 'subagent') return entry.agent.name;
+  if (entry.kind === 'live') return liveTitle(entry.part, entry.part.agentId ? agents[entry.part.agentId]?.name : undefined);
   if (entry.kind === 'thought') return 'Thinking';
   return toolTitle(entry.part, context.catalogId);
 }
@@ -226,6 +279,7 @@ function entryLabel(entry: Entry, context: TimelineContext) {
  */
 function WorkGroup({ entries, streaming, lastInTurn, context }: { entries: Entry[]; streaming: boolean; lastInTurn: boolean; context: TimelineContext }) {
   const [open, setOpen] = useState(false);
+  const agents = useStore((s) => s.agents);
   // A thought is live only while it is the last thing the agent produced.
   const liveAt = (entry: Entry, index: number) => isActive(entry, streaming) || (entry.kind === 'thought' && streaming && lastInTurn && index === entries.length - 1);
   const summary = summarize(entries);
@@ -245,7 +299,7 @@ function WorkGroup({ entries, streaming, lastInTurn, context }: { entries: Entry
   return (
     <WorkLine
       icon={<SummaryIcon size={14} />}
-      label={live ? entryLabel(live, context) : summary}
+      label={live ? entryLabel(live, context, agents) : summary}
       live={live !== null}
       expanded={open}
       onToggle={() => setOpen(!open)}
@@ -375,13 +429,28 @@ function UserPrompt({ message }: { message: Message }) {
   );
 }
 
-function AgentTurn({ message, run, context }: { message: Message; run: Run | undefined; context: TimelineContext }) {
+interface TurnProps {
+  message: Message;
+  run: Run | undefined;
+  context: TimelineContext;
+  prompt: string; // the first line of the prompt that started this turn
+  latest: boolean; // the thread's latest agent message
+}
+
+function AgentTurn({ message, run, context, prompt, latest }: TurnProps) {
   const streaming = message.status === 'streaming';
+  const highlighted = useStore((s) => s.ui.highlight === message.id);
   const rows = messageRows(message, context.catalogId);
   const waiting = streaming && rows.some((r) => r.kind === 'permission' && r.part.outcome === null);
   const hasError = rows.some((r) => r.kind === 'error');
   return (
-    <div className="mt-3 flex flex-col gap-0.5" title={fullTime(message.createdAt)}>
+    <div
+      id={`message-${message.id}`}
+      className={`group/turn -mx-2 mt-3 flex scroll-mt-4 flex-col gap-0.5 rounded-xl px-2 ${highlighted ? 'flash' : ''}`}
+      onAnimationEnd={(e) => {
+        if (e.animationName === 'flash') updateUI({ highlight: null });
+      }}
+    >
       {rows.map((row, index) => {
         switch (row.kind) {
           case 'text':
@@ -405,14 +474,24 @@ function AgentTurn({ message, run, context }: { message: Message; run: Run | und
       {streaming && <WorkingLine since={run?.startedAt ?? message.createdAt} waiting={waiting} />}
       {message.status === 'stopped' && <WorkLine icon={<Square size={12} />} label="Stopped" />}
       {message.status === 'error' && !hasError && run?.error && <ErrorPart text={run.error} />}
+      {!streaming && <MessageMeta message={message} chapterPrompt={prompt} forkFrom={latest ? message.conversationId : undefined} />}
     </div>
   );
 }
 
+function firstLine(message: Message | undefined) {
+  const text = message?.parts.find((p) => p.type === 'text');
+  return text && text.type === 'text' ? text.text.trim().split('\n')[0].trim() : '';
+}
+
 export function CodeTimeline({ messages, runs, context }: { messages: Message[]; runs: Record<string, Run>; context: TimelineContext }) {
+  const latestAgent = messages.findLast((m) => m.author.type === 'agent');
+  // A Code thread's turns follow the person's prompts, so the prompt that started a turn is the last one before it.
+  let prompt: Message | undefined;
   return (
     <>
       {messages.map((message) => {
+        if (message.author.type === 'user') prompt = message;
         if (message.author.type === 'user') return <UserPrompt key={message.id} message={message} />;
         if (message.author.type === 'system') {
           const text = message.parts.map((p) => ('text' in p ? p.text : '')).join(' ');
@@ -422,7 +501,16 @@ export function CodeTimeline({ messages, runs, context }: { messages: Message[];
             </div>
           );
         }
-        return <AgentTurn key={message.id} message={message} run={message.runId ? runs[message.runId] : undefined} context={context} />;
+        return (
+          <AgentTurn
+            key={message.id}
+            message={message}
+            run={message.runId ? runs[message.runId] : undefined}
+            context={context}
+            prompt={firstLine(prompt)}
+            latest={message === latestAgent}
+          />
+        );
       })}
     </>
   );

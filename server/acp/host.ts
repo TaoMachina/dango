@@ -1,7 +1,7 @@
 // Drives ACP agents: one process per agent, one ACP session per (agent, conversation).
 import { mkdirSync } from 'node:fs';
-import * as acp from '@agentclientprotocol/sdk';
-import type { Agent, AgentOptions, AgentStatus, Conversation, ConversationKind, ID, SessionInfo } from '../../shared/types.ts';
+import * as acp from '@agentclientprotocol/sdk/unstable';
+import type { Agent, AgentOptions, AgentStatus, Conversation, ConversationKind, ID, Part, SessionInfo } from '../../shared/types.ts';
 import type { CatalogEntry } from '../agents/catalog.ts';
 import type { Events } from '../events.ts';
 import type { ToolTokens } from '../mcp/tools.ts';
@@ -10,7 +10,8 @@ import { membershipKey, membershipUpdate, sessionContext } from './context.ts';
 import { formatPrompt, type Executor, type LiveRun, type RunOutcome, type Runs } from '../routing.ts';
 import type { Store } from '../store.ts';
 import {
-  applyUpdate, changes, chatDefaults, LEGACY_MODE_ID, sessionInfo, stateFrom, upsertTool, withChoices, type Choice, type SessionState,
+  applyUpdate, blockText, changes, chatDefaults, currentModelName, LEGACY_MODE_ID, sessionInfo, stateFrom, upsertTool, withChoices,
+  type Choice, type SessionState,
 } from './mapping.ts';
 import { AgentProcess } from './process.ts';
 
@@ -30,6 +31,23 @@ interface Session {
   membership: string;
   // Set once the conversation's chosen options are applied; session.upsert is sent from then on.
   ready: boolean;
+}
+
+type SubagentPart = Extract<Part, { type: 'subagent' }>;
+
+// A subagent session the agent announced with subagent_update. Its updates arrive under its own session id.
+interface Child {
+  // The conversation's session; its active run shows the subagent, also for a subagent's own subagents.
+  root: Session;
+  part: SubagentPart;
+  // The end of the subagent's streamed text, enough to find its latest line.
+  text: string;
+}
+
+function subagentState(state: acp.StateUpdate | null): SubagentPart['state'] {
+  // null clears the reported state without claiming one.
+  if (state === null) return 'unknown';
+  return state.state === 'running' || state.state === 'idle' || state.state === 'requires_action' ? state.state : 'unknown';
 }
 
 // ACP reserves -32000 for "authentication required".
@@ -60,6 +78,7 @@ export class AcpHost implements Executor {
   private sessions = new Map<string, Promise<Session>>();
   private readySessions = new Map<string, Session>();
   private bySessionId = new Map<string, Session>();
+  private children = new Map<string, Child>();
 
   constructor(options: AcpHostOptions) {
     this.o = options;
@@ -77,11 +96,13 @@ export class AcpHost implements Executor {
     const entry = this.o.catalog.find(e => e.id === agent.catalogId);
     if (!entry) throw new Error(`${agent.runtimeLabel} is not in Agentry's agent catalog.`);
     this.setStatus(agent.id, 'starting', null);
+    const subagentModel = this.o.store.getAgent(agent.id)?.subagentModel?.value;
+    const env = subagentModel && entry.subagentModelEnv ? entry.subagentModelEnv(subagentModel) : {};
     const proc = new AgentProcess(entry, {
       onUpdate: n => this.onUpdate(n),
       onPermission: (request, signal) => this.onPermission(request, signal),
       onExit: detail => this.onExit(agent.id, proc, detail),
-    });
+    }, env);
     const started = proc.initialize().then(
       () => {
         this.setStatus(agent.id, 'ready', null);
@@ -106,6 +127,9 @@ export class AcpHost implements Executor {
       this.bySessionId.delete(key);
       this.sessions.delete(`${session.agentId}:${session.conversationId}`);
       this.readySessions.delete(`${session.agentId}:${session.conversationId}`);
+    }
+    for (const [key, child] of this.children) {
+      if (child.root.process === proc) this.children.delete(key);
     }
     // A failed start or a sign-in request already set a more specific status.
     const agent = this.o.store.getAgent(agentId);
@@ -218,7 +242,7 @@ export class AcpHost implements Executor {
       }
       this.o.store.saveAcpSession(agent.id, conversation.id, session.sessionId, cwd);
       // A session that never had a turn holds nothing to lose (Codex does not even keep it), so stay quiet.
-      if (notice && this.o.store.hasRuns(conversation.id, agent.id)) this.o.runs.postMessage(conversation.id, { type: 'system' }, notice);
+      if (notice && this.o.store.hasEndedRuns(conversation.id, agent.id)) this.o.runs.postMessage(conversation.id, { type: 'system' }, notice);
     }
     this.bySessionId.set(session.sessionId, session);
     this.changed(session);
@@ -255,18 +279,27 @@ export class AcpHost implements Executor {
 
   // Keeps the agent's last settings so the next session shows them at once, and tells clients once the session is ready.
   private changed(session: Session) {
+    const before = JSON.stringify(this.o.store.getAgent(session.agentId)?.subagentModel?.choices);
     this.o.store.saveSessionCache(session.agentId, session.state);
     const agent = this.o.store.getAgent(session.agentId);
+    // The subagent model choices come from the agent's reported models.
+    if (agent?.subagentModel && JSON.stringify(agent.subagentModel.choices) !== before) this.o.events.emit({ type: 'agent.upsert', agent });
     if (agent) this.o.events.emit({ type: 'agent.options', options: this.draftOptions(agent) });
     if (!session.ready) return;
     this.o.events.emit({ type: 'session.upsert', session: sessionInfo({ id: session.conversationId, kind: session.kind }, session.agentId, session.state, true) });
   }
 
   private onUpdate(notification: acp.SessionNotification) {
-    const session = this.bySessionId.get(notification.sessionId);
-    if (!session) return;
     const update = notification.update;
+    const session = this.bySessionId.get(notification.sessionId);
+    if (!session) {
+      const child = this.children.get(notification.sessionId);
+      if (child) this.onChildUpdate(child, update);
+      return;
+    }
     switch (update.sessionUpdate) {
+      case 'subagent_update':
+        return this.onSubagentUpdate(session, update);
       case 'available_commands_update':
         session.state.commands = update.availableCommands.map(c => ({ name: c.name, description: c.description }));
         return this.changed(session);
@@ -288,8 +321,73 @@ export class AcpHost implements Executor {
     applyUpdate(session.live, update);
   }
 
+  // Announces a subagent or changes its title, description or state. Omitted fields stay as they were.
+  private onSubagentUpdate(root: Session, update: acp.SubagentUpdate) {
+    let child = this.children.get(update.sessionId);
+    if (!child) {
+      child = {
+        root, text: '',
+        part: {
+          type: 'subagent', sessionId: update.sessionId, title: null, description: null, state: 'unknown', activity: null, model: null,
+          agentId: null, conversationId: null,
+        },
+      };
+      this.children.set(update.sessionId, child);
+    }
+    if (update.title !== undefined) child.part.title = update.title;
+    if (update.description !== undefined) child.part.description = update.description;
+    if (update.state !== undefined) child.part.state = subagentState(update.state);
+    this.showChild(child);
+  }
+
+  // A subagent's own session updates become its part's latest activity and model; they start no run and no message.
+  private onChildUpdate(child: Child, update: acp.SessionUpdate) {
+    const part = child.part;
+    switch (update.sessionUpdate) {
+      case 'subagent_update':
+        return this.onSubagentUpdate(child.root, update);
+      case 'tool_call':
+      case 'tool_call_update':
+        if (!update.title || update.title === part.activity) return;
+        part.activity = update.title;
+        child.text = '';
+        break;
+      case 'agent_message_chunk': {
+        const text = blockText(update.content);
+        if (!text) return;
+        // The last two lines hold the latest non-empty one even when the text ends with a line break.
+        child.text = (child.text + text).split('\n').slice(-2).join('\n');
+        const line = child.text.split('\n').map(l => l.trim()).filter(Boolean).at(-1);
+        if (!line || line === part.activity) return;
+        part.activity = line;
+        break;
+      }
+      case 'config_option_update': {
+        const model = currentModelName(update.configOptions);
+        if (model === null || model === part.model) return;
+        part.model = model;
+        break;
+      }
+      default:
+        return;
+    }
+    this.showChild(child);
+  }
+
+  // Shows the subagent in the conversation's active run. A subagent that reports while no run is active appears in the next one.
+  private showChild(child: Child) {
+    const live = child.root.live;
+    if (!live || child.root.loading) return;
+    const index = live.parts.findIndex(p => p.type === 'subagent' && p.sessionId === child.part.sessionId);
+    // Agents repeat unchanged fields, such as the working directory this part does not show.
+    if (index >= 0 && JSON.stringify(live.parts[index]) === JSON.stringify(child.part)) return;
+    if (index >= 0) live.setPart(index, { ...child.part });
+    else live.pushPart({ ...child.part });
+  }
+
   private async onPermission(request: acp.RequestPermissionRequest, signal: AbortSignal): Promise<acp.RequestPermissionResponse> {
-    const live = this.bySessionId.get(request.sessionId)?.live;
+    // A subagent's request is shown in the run of the conversation that started it.
+    const live = (this.bySessionId.get(request.sessionId) ?? this.children.get(request.sessionId)?.root)?.live;
     if (!live || live.finished) return { outcome: { outcome: 'cancelled' } };
     const tool = upsertTool(live, request.toolCall);
     const title = tool.type === 'tool' && tool.title ? tool.title : 'Permission requested';
@@ -376,6 +474,36 @@ export class AcpHost implements Executor {
       () => {}, // openSession reports its own failure on the agent's status.
     );
     return this.cachedInfo(agent, conversation);
+  }
+
+  // Copies the agent's native session of `source` into a new session for `target`, a conversation the caller then creates.
+  // The new session stays in the source session's folder.
+  async forkSession(agent: Agent, source: Conversation, target: Conversation): Promise<{ sessionId: string; cwd: string }> {
+    const proc = await this.ensureProcess(agent);
+    const caps = proc.init?.agentCapabilities ?? {};
+    if (!caps.sessionCapabilities?.fork) throw new HttpError(400, `${agent.name} cannot fork a session.`);
+    const stored = this.o.store.getAcpSession(agent.id, source.id);
+    if (!stored) throw new HttpError(400, `${agent.name} has no session in this thread yet.`);
+    const systemPrompt: acp.SystemPrompt | undefined = caps.sessionCapabilities.systemPrompt
+      ? { mode: 'append', content: [{ type: 'text', text: this.context(agent, target) }] }
+      : undefined;
+    try {
+      const response = await proc.connection.agent.request('session/fork', {
+        sessionId: stored.sessionId, cwd: stored.cwd, mcpServers: this.mcpServers(agent.id, target.id), systemPrompt,
+      });
+      return { sessionId: response.sessionId, cwd: stored.cwd };
+    } catch (error) {
+      if (error instanceof acp.RequestError && error.code === AUTH_REQUIRED) throw this.needsAuth(agent);
+      throw new Error(`${agent.runtimeLabel} could not fork the session: ${errorText(error)}`);
+    }
+  }
+
+  // The runtime reads its subagent model when it starts. An idle agent restarts now (its sessions resume on the next prompt);
+  // an agent with an active run keeps its process until its next start.
+  async restartForSettings(agent: Agent) {
+    const running = this.processes.get(agent.id);
+    if (!running || [...this.o.runs.lives.values()].some(live => live.agent.id === agent.id)) return;
+    await (await running).stop();
   }
 
   async stopAll() {

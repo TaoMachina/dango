@@ -102,11 +102,20 @@ export class LiveRun {
     return this.message!.parts;
   }
 
+  private textBreak = false;
+
+  // The next text chunk starts a new part instead of continuing the last one.
+  breakText() {
+    this.textBreak = true;
+  }
+
   appendText(type: 'text' | 'thought', text: string) {
     if (this.finished) return;
     const index = this.parts.length - 1;
     const last = this.parts[index];
-    if (last && last.type === type) {
+    const continues = !this.textBreak;
+    this.textBreak = false;
+    if (last && last.type === type && continues) {
       last.text += text;
       this.runs.events.emit({ type: 'message.append', conversationId: this.conversation.id, messageId: this.message!.id, partIndex: index, text });
     } else {
@@ -344,6 +353,16 @@ export class Runs {
     if (!pending) return false;
     pending.live.answerPermission(requestId, answer);
     return true;
+  }
+
+  // Pins a message as a chapter, or unpins it. A streaming message's in-memory copy changes too, so its final upsert keeps the label.
+  setChapter(message: StoredMessage, chapter: string | null): Message {
+    this.store.setChapter(message.id, chapter);
+    const live = message.runId ? this.lives.get(message.runId) : undefined;
+    if (live?.message?.id === message.id) live.message.chapter = chapter;
+    const updated = this.currentMessage(this.store.getMessage(message.id)!);
+    this.emitMessage(updated);
+    return updated;
   }
 
   // The in-memory copy of a streaming message is newer than the stored one.

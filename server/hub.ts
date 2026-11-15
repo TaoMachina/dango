@@ -40,8 +40,8 @@ export async function createHub(options: HubOptions) {
   mkdirSync(paths.dir, { recursive: true });
   const key = loadOrCreateKey(paths.key);
   const db = openDb(paths.db);
-  const store = new Store(db);
   const catalog = options.catalog ?? builtInCatalog;
+  const store = new Store(db, catalog);
   const webDist = options.webDist === undefined ? join(serverDir, '..', 'web', 'dist') : options.webDist;
 
   // No agent process survives a restart: installed agents start idle, external ones until they poll again.

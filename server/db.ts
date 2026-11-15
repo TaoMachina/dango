@@ -144,6 +144,12 @@ const migrations: string[] = [
     session_header TEXT
   );
   `,
+  `
+  -- The model the agent's own subagents use, set through the agent's native setting; NULL keeps the agent's default.
+  ALTER TABLE agents ADD COLUMN subagent_model TEXT;
+  -- A label the person gave the message as a chapter of its thread.
+  ALTER TABLE messages ADD COLUMN chapter TEXT;
+  `,
 ];
 
 export function openDb(file: string): DatabaseSync {

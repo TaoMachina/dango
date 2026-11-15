@@ -1,7 +1,7 @@
 // One agent process speaking ACP over its stdio.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
-import * as acp from '@agentclientprotocol/sdk';
+import * as acp from '@agentclientprotocol/sdk/unstable';
 import { resolveLaunch, type CatalogEntry } from '../agents/catalog.ts';
 
 export interface ProcessHandlers {
@@ -21,10 +21,11 @@ export class AgentProcess {
   private stderrTail = '';
   private stopping = false;
 
-  constructor(entry: CatalogEntry, handlers: ProcessHandlers) {
+  // env: settings the person chose for this agent that its runtime reads at start, such as its subagent model.
+  constructor(entry: CatalogEntry, handlers: ProcessHandlers, env: Record<string, string> = {}) {
     const launch = resolveLaunch(entry.launch());
     this.child = spawn(launch.command, launch.args, {
-      shell: launch.shell, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...launch.env },
+      shell: launch.shell, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...launch.env, ...env },
     });
     this.child.stderr!.on('data', (chunk: Buffer) => {
       this.stderrTail = (this.stderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_BYTES);
@@ -57,7 +58,8 @@ export class AgentProcess {
     this.init = await this.connection.agent.request('initialize', {
       protocolVersion: acp.PROTOCOL_VERSION,
       // Agents use their own file and terminal tools, so Agentry offers neither.
-      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+      // subagents: the agent reports each subagent it starts and streams the subagent's own session updates.
+      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, subagents: {} },
       clientInfo: { name: 'agentry', version: '0.2.0' },
     });
     return this.init;

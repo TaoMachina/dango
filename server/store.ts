@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type {
   Agent, Avatar, Conversation, ConversationKind, ID, Message, MessageAuthor, Part, Project, Routine, Run, Schedule,
 } from '../shared/types.ts';
-import type { Choice, SessionState } from './acp/mapping.ts';
+import { modelChoices, type Choice, type SessionState } from './acp/mapping.ts';
+import type { CatalogEntry } from './agents/catalog.ts';
 
 // Where the hub calls a 'url' agent. baseUrl has no trailing '/v1' or slash.
 export interface UrlAgentConfig { baseUrl: string; apiKey: string | null; model: string | null; sessionHeader: string | null }
@@ -23,7 +24,11 @@ export function messageText(parts: Part[]): string {
 
 export class Store {
   db: DatabaseSync;
-  constructor(db: DatabaseSync) { this.db = db; }
+  catalog: CatalogEntry[];
+  constructor(db: DatabaseSync, catalog: CatalogEntry[]) {
+    this.db = db;
+    this.catalog = catalog;
+  }
 
   // ---------- agents ----------
 
@@ -34,8 +39,16 @@ export class Store {
       id: r.id, name: r.name, avatar: JSON.parse(r.avatar), description: r.description, source: r.source,
       catalogId: r.catalog_id, runtimeLabel: r.runtime_label, environmentId: r.environment_id,
       status: working ? 'working' : r.status, statusDetail: r.status_detail, apiHost, hidden: !!r.hidden, chatId: r.chat_id,
-      createdAt: r.created_at,
+      subagentModel: this.subagentModelFrom(r), createdAt: r.created_at,
     };
+  }
+
+  // Only agents whose catalog entry knows the runtime's own setting offer it. The choices are the models
+  // the agent reported in its last session, so an agent that never ran offers none yet.
+  private subagentModelFrom(r: Row): Agent['subagentModel'] {
+    const entry = r.source === 'acp' ? this.catalog.find(e => e.id === r.catalog_id) : undefined;
+    if (!entry?.subagentModelEnv) return null;
+    return { value: r.subagent_model, choices: modelChoices(this.getSessionCache(r.id)?.configOptions ?? []) };
   }
 
   listAgents(): Agent[] {
@@ -47,7 +60,7 @@ export class Store {
     return r ? this.agentFrom(r) : null;
   }
 
-  insertAgent(a: Omit<Agent, 'createdAt' | 'apiHost'>) {
+  insertAgent(a: Omit<Agent, 'createdAt' | 'apiHost' | 'subagentModel'>) {
     this.db.prepare(`INSERT INTO agents (id, name, avatar, description, source, catalog_id, runtime_label, environment_id, status, status_detail, hidden, chat_id, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       a.id, a.name, JSON.stringify(a.avatar), a.description, a.source, a.catalogId, a.runtimeLabel, a.environmentId,
@@ -61,6 +74,10 @@ export class Store {
     };
     this.update('agents', id, columns);
     return this.getAgent(id)!;
+  }
+
+  setSubagentModel(id: ID, model: string | null) {
+    this.db.prepare('UPDATE agents SET subagent_model = ? WHERE id = ?').run(model, id);
   }
 
   deleteAgent(id: ID) {
@@ -160,14 +177,15 @@ export class Store {
   private messageFrom(r: Row): StoredMessage {
     return {
       id: r.id, conversationId: r.conversation_id, author: JSON.parse(r.author), parts: JSON.parse(r.parts),
-      mentions: JSON.parse(r.mentions), runId: r.run_id, status: r.status, createdAt: r.created_at, seq: r.seq,
+      mentions: JSON.parse(r.mentions), runId: r.run_id, status: r.status, chapter: r.chapter, createdAt: r.created_at, seq: r.seq,
     };
   }
 
-  insertMessage(m: { conversationId: ID; author: MessageAuthor; parts: Part[]; mentions?: ID[]; runId?: ID | null; status: Message['status'] }): StoredMessage {
+  // createdAt: a copied message (a fork) keeps the time it was first written.
+  insertMessage(m: { conversationId: ID; author: MessageAuthor; parts: Part[]; mentions?: ID[]; runId?: ID | null; status: Message['status']; createdAt?: string }): StoredMessage {
     const id = newId();
     this.db.prepare(`INSERT INTO messages (id, conversation_id, author, parts, mentions, run_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, m.conversationId, JSON.stringify(m.author), JSON.stringify(m.parts), JSON.stringify(m.mentions ?? []), m.runId ?? null, m.status, now());
+      .run(id, m.conversationId, JSON.stringify(m.author), JSON.stringify(m.parts), JSON.stringify(m.mentions ?? []), m.runId ?? null, m.status, m.createdAt ?? now());
     this.touchConversation(m.conversationId);
     return this.getMessage(id)!;
   }
@@ -180,6 +198,16 @@ export class Store {
   saveMessage(m: Message) {
     this.db.prepare('UPDATE messages SET parts = ?, mentions = ?, status = ? WHERE id = ?')
       .run(JSON.stringify(m.parts), JSON.stringify(m.mentions), m.status, m.id);
+  }
+
+  setChapter(id: ID, chapter: string | null) {
+    this.db.prepare('UPDATE messages SET chapter = ? WHERE id = ?').run(chapter, id);
+  }
+
+  latestAgentMessage(conversationId: ID): StoredMessage | null {
+    const r = this.db.prepare(`SELECT * FROM messages WHERE conversation_id = ? AND json_extract(author, '$.type') = 'agent' ORDER BY seq DESC LIMIT 1`)
+      .get(conversationId) as Row | undefined;
+    return r ? this.messageFrom(r) : null;
   }
 
   // The newest `limit` messages before `beforeId`, oldest first.
@@ -231,8 +259,9 @@ export class Store {
     return this.db.prepare('SELECT * FROM runs WHERE parent_run_id = ?').all(parentRunId).map(r => this.runFrom(r as Row));
   }
 
-  hasRuns(conversationId: ID, agentId: ID): boolean {
-    return this.count('SELECT COUNT(*) AS n FROM runs WHERE conversation_id = ? AND agent_id = ?', conversationId, agentId) > 0;
+  // A run that has ended, so the agent's session held a turn. A run waiting for the session does not count.
+  hasEndedRuns(conversationId: ID, agentId: ID): boolean {
+    return this.count(`SELECT COUNT(*) AS n FROM runs WHERE conversation_id = ? AND agent_id = ? AND status NOT IN ('queued', 'running')`, conversationId, agentId) > 0;
   }
 
   latestRun(conversationId: ID) {

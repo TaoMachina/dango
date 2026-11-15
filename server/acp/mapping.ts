@@ -1,5 +1,5 @@
 // Maps ACP session updates onto Agentry message parts and session settings.
-import type * as acp from '@agentclientprotocol/sdk';
+import type * as acp from '@agentclientprotocol/sdk/unstable';
 import type { ConversationKind, ID, Part, SessionInfo, SessionOption, ToolContent } from '../../shared/types.ts';
 import type { LiveRun } from '../routing.ts';
 
@@ -21,11 +21,34 @@ export function stateFrom(response: { modes?: acp.SessionModeState | null; confi
   return { configOptions: response.configOptions ?? [], modes: response.modes ?? null, commands: [], usage: null };
 }
 
+function selectChoices(o: Extract<acp.SessionConfigOption, { type: 'select' }>) {
+  return o.options.flatMap(c => ('group' in c ? c.options : [c]));
+}
+
 function optionFrom(o: acp.SessionConfigOption): SessionOption {
   const common = { id: o.id, name: o.name, description: o.description ?? null, category: o.category ?? null };
   if (o.type === 'boolean') return { ...common, type: 'boolean', currentValue: o.currentValue };
-  const choices = o.options.flatMap(c => ('group' in c ? c.options : [c])).map(c => ({ value: c.value, name: c.name, description: c.description ?? null }));
+  const choices = selectChoices(o).map(c => ({ value: c.value, name: c.name, description: c.description ?? null }));
   return { ...common, type: 'select', currentValue: o.currentValue, choices };
+}
+
+// The agent's model option: category 'model', or an option named 'model' by an agent that leaves the category out.
+function modelOption(configOptions: acp.SessionConfigOption[]) {
+  const option = configOptions.find(o => o.category === 'model') ?? configOptions.find(o => o.id === 'model');
+  return option?.type === 'select' ? option : null;
+}
+
+// The models an agent offers, as it names them.
+export function modelChoices(configOptions: acp.SessionConfigOption[]): { value: string; name: string }[] {
+  const option = modelOption(configOptions);
+  return option ? selectChoices(option).map(c => ({ value: c.value, name: c.name })) : [];
+}
+
+// The name of the model a session reports as current; a subagent reports only its own model as the one choice.
+export function currentModelName(configOptions: acp.SessionConfigOption[]): string | null {
+  const option = modelOption(configOptions);
+  if (!option) return null;
+  return selectChoices(option).find(c => c.value === option.currentValue)?.name ?? option.currentValue;
 }
 
 // Every option the agent reports, with legacy modes as one more select.
@@ -96,7 +119,7 @@ export function chatDefaults(state: SessionState): Choice[] {
   });
 }
 
-function blockText(block: acp.ContentBlock): string | null {
+export function blockText(block: acp.ContentBlock): string | null {
   if (block.type === 'text') return block.text;
   if (block.type === 'resource_link') return `[${block.title ?? block.name}](${block.uri})`;
   if (block.type === 'resource' && 'text' in block.resource) return block.resource.text;
@@ -104,6 +127,8 @@ function blockText(block: acp.ContentBlock): string | null {
 }
 
 function toolContent(content: acp.ToolCallContent): ToolContent | null {
+  // A reference to a subagent's session; the subagent has its own part.
+  if (content.type === 'session') return null;
   if (content.type === 'diff') return { type: 'diff', path: content.path, oldText: content.oldText ?? null, newText: content.newText };
   if (content.type === 'terminal') return { type: 'terminal', terminalId: content.terminalId };
   if (content.content.type === 'image') return { type: 'image', mimeType: content.content.mimeType, data: content.content.data };
@@ -157,5 +182,10 @@ export function applyUpdate(live: LiveRun, update: acp.SessionUpdate) {
       else live.pushPart(part);
       return;
     }
+    // Messages exchanged with a subagent sit between the agent's own text; the text after them is a new paragraph.
+    case 'session_message':
+    case 'session_message_chunk':
+      live.breakText();
+      return;
   }
 }

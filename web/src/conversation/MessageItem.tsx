@@ -2,7 +2,8 @@ import type { Agent, Message, Part, Run } from '../../../shared/types.ts';
 import { Avatar } from '../components/Avatar.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { fullTime } from '../lib/time.ts';
-import { ErrorPart, ImagePart, PermissionPart, PlanPart, ThoughtPart, ToolPart } from './parts.tsx';
+import { MessageMeta } from './MessageActions.tsx';
+import { ErrorPart, ImagePart, PermissionPart, PlanPart, SubagentPart, ThoughtPart, ToolPart } from './parts.tsx';
 
 function PartView({ part, mine }: { part: Part; mine: boolean }) {
   switch (part.type) {
@@ -24,6 +25,8 @@ function PartView({ part, mine }: { part: Part; mine: boolean }) {
       return <ImagePart part={part} />;
     case 'error':
       return <ErrorPart text={part.text} />;
+    case 'subagent':
+      return <SubagentPart part={part} />;
   }
 }
 
@@ -55,7 +58,7 @@ export function MessageItem({ message, agent, showHeader, triggeredBy, run }: Pr
   const mine = message.author.type === 'user';
   const hasError = message.parts.some((p) => p.type === 'error');
   return (
-    <div className={`flex flex-col gap-1.5 ${mine ? 'items-end' : 'items-start'} ${showHeader ? 'mt-4' : 'mt-1.5'}`} title={fullTime(message.createdAt)}>
+    <div className={`group/turn flex flex-col gap-1.5 ${mine ? 'items-end' : 'items-start'} ${showHeader ? 'mt-4' : 'mt-1.5'}`} title={mine ? fullTime(message.createdAt) : undefined}>
       {showHeader && agent && (
         <div className="flex items-center gap-2 text-[13px]">
           <Avatar avatar={agent.avatar} size={22} />
@@ -69,6 +72,12 @@ export function MessageItem({ message, agent, showHeader, triggeredBy, run }: Pr
       {message.status === 'streaming' && message.parts.length === 0 && <Typing />}
       {message.status === 'stopped' && <p className="text-[12px] text-muted">Stopped</p>}
       {message.status === 'error' && !hasError && run?.error && <ErrorPart text={run.error} />}
+      {/* Pulled up into the bubble gap so the time sits with its message, not between messages. */}
+      {!mine && message.status !== 'streaming' && (
+        <div className="-mt-1 pl-1">
+          <MessageMeta message={message} />
+        </div>
+      )}
     </div>
   );
 }

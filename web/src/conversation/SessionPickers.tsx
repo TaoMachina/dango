@@ -297,7 +297,7 @@ export function ModePicker({ mode, set }: { mode: Select; set: SetOption }) {
   );
 }
 
-function tokens(n: number) {
+export function tokens(n: number) {
   const short = (x: number) => String(Math.round(x * 10) / 10);
   if (n < 1000) return String(n);
   if (n < 1_000_000) return `${short(n / 1000)}k`;

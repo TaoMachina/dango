@@ -13,6 +13,7 @@ import type {
   SessionInfo,
   SessionOption,
   StateResponse,
+  ThreadInfo,
 } from '../../../shared/types.ts';
 import { api } from './api.ts';
 import { byId, getState, sessionKey, setState, updateThread, updateUI, upsert, type Module } from './store.ts';
@@ -152,6 +153,18 @@ export function stop(conversationId: ID) {
   return api('POST', `/api/conversations/${conversationId}/stop`);
 }
 
+/** Pins a message as a chapter of its thread, or unpins it with null. */
+export async function setChapter(messageId: ID, chapter: string | null) {
+  upsertMessage(await api<Message>('PATCH', `/api/messages/${messageId}`, { chapter }));
+}
+
+/** Scrolls the open timeline to a message and highlights it briefly. */
+export function focusMessage(messageId: ID) {
+  updateUI({ drawer: null, highlight: messageId });
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.getElementById(`message-${messageId}`)!.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
+}
+
 export function answerPermission(requestId: ID, optionId: string) {
   return api('POST', `/api/permissions/${requestId}`, { optionId });
 }
@@ -189,7 +202,7 @@ export async function setSessionOption(conversationId: ID, agentId: ID, optionId
 
 // ---------- Agents ----------
 
-export async function patchAgent(id: ID, body: { name?: string; avatar?: Avatar; description?: string; hidden?: boolean }) {
+export async function patchAgent(id: ID, body: { name?: string; avatar?: Avatar; description?: string; hidden?: boolean; subagentModel?: string | null }) {
   upsert('agents', await api<Agent>('PATCH', `/api/agents/${id}`, body));
 }
 
@@ -224,6 +237,18 @@ export async function patchConversation(
   body: { title?: string; avatar?: Avatar; memberIds?: ID[]; leadId?: ID | null; hopLimit?: number },
 ) {
   upsert('conversations', await api<Conversation>('PATCH', `/api/conversations/${id}`, body));
+}
+
+/** Where a Code thread works: the computer, its folder and the git branch checked out there. */
+export function threadInfo(conversationId: ID) {
+  return api<ThreadInfo>('GET', `/api/conversations/${conversationId}/info`);
+}
+
+/** Forks a Code thread at its latest agent message into a new thread with the same native session, then opens it. */
+export async function forkThread(conversationId: ID, messageId: ID) {
+  const conversation = await api<Conversation>('POST', `/api/conversations/${conversationId}/fork`, { messageId });
+  upsert('conversations', conversation);
+  select('code', conversation.id);
 }
 
 // Removes a pasted-in or URL agent with its chat; the hub's agent.removed and conversation.removed events update the lists.

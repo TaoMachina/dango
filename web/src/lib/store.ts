@@ -33,6 +33,7 @@ export interface UI {
   listCollapsed: boolean; // wide screens
   panelOpen: boolean; // wide screens
   drawer: Drawer; // narrow screens
+  highlight: ID | null; // a message the timeline flashes after a jump to it
 }
 
 export interface State {
@@ -70,6 +71,7 @@ let state: State = {
     listCollapsed: localStorage.getItem('agentry.listCollapsed') === '1',
     panelOpen: localStorage.getItem('agentry.panelOpen') !== '0',
     drawer: null,
+    highlight: null,
   },
 };
 

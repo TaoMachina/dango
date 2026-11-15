@@ -165,6 +165,17 @@ button:disabled {
   animation: shimmer 1.2s linear infinite;
 }
 
+/* A message the person jumped to from the right panel: a soft background that fades out.
+   Long enough to find the message after the scroll settles. */
+@keyframes flash {
+  from { background-color: var(--selected); }
+  to { background-color: transparent; }
+}
+
+.flash {
+  animation: flash 1.6s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

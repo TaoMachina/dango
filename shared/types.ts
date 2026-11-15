@@ -46,6 +46,9 @@ export interface Agent {
   apiHost: string | null; // url agents: the host of their API (never the key); null for others
   hidden: boolean;
   chatId: ID; // the agent's own persistent chat
+  // The model this agent's own subagents use, set through the agent's native mechanism.
+  // null when the agent offers no such setting; value null means the agent's own default.
+  subagentModel: { value: string | null; choices: { value: string; name: string }[] } | null;
   createdAt: ISODate;
 }
 
@@ -113,7 +116,21 @@ export type Part =
       outcome: { optionId: string } | { cancelled: true } | null; // null while waiting for the person
     }
   | { type: 'image'; mimeType: string; data: string } // base64
-  | { type: 'error'; text: string };
+  | { type: 'error'; text: string }
+  | {
+      // A subagent the agent started, from ACP subagent_update and the child session's own updates.
+      type: 'subagent';
+      sessionId: string; // the child ACP session
+      title: string | null;
+      description: string | null;
+      state: 'running' | 'idle' | 'requires_action' | 'unknown';
+      activity: string | null; // the child's latest step, e.g. its current tool title or a line of its text
+      model: string | null; // the child's model when it reports one
+      // Set when the subagent is another agent that Agentry runs for this one (cross-agent delegation);
+      // both null for the agent's own native subagents.
+      agentId: ID | null;
+      conversationId: ID | null; // the child thread, openable from the parent
+    };
 
 export type MessageAuthor = { type: 'user' } | { type: 'agent'; agentId: ID } | { type: 'system' };
 
@@ -125,6 +142,7 @@ export interface Message {
   mentions: ID[]; // agent IDs mentioned by a user or agent message
   runId: ID | null; // agent messages: the run that produced them
   status: 'streaming' | 'done' | 'stopped' | 'error';
+  chapter: string | null; // set when the person pins the message as a chapter of the thread
   createdAt: ISODate;
 }
 
@@ -182,6 +200,12 @@ export interface SessionInfo {
   ready: boolean; // false while the agent process or session is still starting; options then come from the agent's last session
 }
 
+export interface ThreadInfo {
+  environment: string; // the computer's name
+  folder: string | null; // the project folder
+  branch: string | null; // the git branch checked out in that folder, null outside a git repository
+}
+
 // What a new Code thread can choose for an agent: its model, effort, mode and other options from its last session.
 export interface AgentOptions {
   agentId: ID;
@@ -226,10 +250,13 @@ export interface StateResponse {
 // POST   /api/conversations                           CreateConversationRequest -> Conversation
 // PATCH  /api/conversations/:id                       { title?, avatar?, memberIds?, leadId?, hopLimit? } -> Conversation
 // DELETE /api/conversations/:id                       -> {} (groups and code threads only)
+// GET    /api/conversations/:id/info                  -> ThreadInfo (code threads: where the work happens)
+// POST   /api/conversations/:id/fork                  { messageId } -> Conversation (code threads; messageId must be the latest agent message: the native session is copied whole)
+// PATCH  /api/messages/:id                            { chapter: string | null } -> Message (pin as a chapter, or unpin)
 // POST   /api/conversations/:id/session               { agentId } -> SessionInfo (answers at once; starts the agent and its session in the background and sends session.upsert when ready)
 // POST   /api/conversations/:id/session/option        { agentId, optionId, value: string | boolean } -> SessionInfo
 // POST   /api/permissions/:requestId                  { optionId } | { cancel: true } -> {}
-// PATCH  /api/agents/:id                              { name?, avatar?, description?, hidden? } -> Agent
+// PATCH  /api/agents/:id                              { name?, avatar?, description?, hidden?, subagentModel?: string | null } -> Agent
 // POST   /api/agents/rescan                           -> { agents: Agent[] }
 // POST   /api/agents/:id/options                      -> AgentOptions (for a new Code thread; starts an agent never run before and sends agent.options when known)
 // POST   /api/agents/external                         -> { instruction: string } (the agent appears when it first calls the hub)

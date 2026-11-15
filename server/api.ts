@@ -1,7 +1,7 @@
 // Browser API routes (/api/*). The contract is in shared/types.ts.
 import { hostname } from 'node:os';
 import { z } from 'zod';
-import type { Agent, Conversation, ID, SessionInfo, StateResponse } from '../shared/types.ts';
+import type { Agent, Conversation, ID, SessionInfo, StateResponse, ThreadInfo } from '../shared/types.ts';
 import type { AcpHost } from './acp/host.ts';
 import type { CatalogEntry } from './agents/catalog.ts';
 import { defaultAvatar, rescan } from './agents/registry.ts';
@@ -10,10 +10,11 @@ import type { External } from './external.ts';
 import { connectSchema, type UrlAgents } from './url-agent.ts';
 import { parse, Router } from './http.ts';
 import { pickFolder } from './folder-picker.ts';
+import { gitBranch } from './git.ts';
 import { addFolder, createNamed, HttpError, newTaskFolder } from './projects.ts';
 import { scheduleSchema, type Routines } from './routines.ts';
 import { publicRun, type Runs } from './routing.ts';
-import type { Store } from './store.ts';
+import { newId, publicMessage, type Store } from './store.ts';
 
 export interface ApiDeps {
   store: Store;
@@ -32,6 +33,9 @@ export interface ApiDeps {
 const DEFAULT_HOP_LIMIT = 3;
 // shared/types.ts: a message page holds the newest 100 messages.
 const MESSAGE_PAGE = 100;
+// A chapter label is one line in the thread's chapter list. 80 characters is the traditional width of one line of text;
+// a longer label would wrap there instead of reading as a heading.
+const CHAPTER_MAX_LENGTH = 80;
 
 const avatarSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('blob'), color: z.string(), shape: z.number().int(), face: z.number().int() }),
@@ -163,6 +167,52 @@ export function apiRoutes(d: ApiDeps): Router {
       return {};
     })
 
+    .on('GET', '/api/conversations/:id/info', async (c): Promise<ThreadInfo> => {
+      const conv = conversation(c.params.id);
+      const folder = conv.projectId ? store.getProject(conv.projectId)?.path ?? null : null;
+      return { environment: hostname(), folder, branch: folder ? await gitBranch(folder) : null };
+    })
+
+    // The agent copies its native session whole, so only the thread as it stands after its latest reply can be forked.
+    .on('POST', '/api/conversations/:id/fork', async c => {
+      const source = conversation(c.params.id);
+      const { messageId } = parse(z.object({ messageId: z.string() }), c.body);
+      if (source.kind !== 'code') throw new HttpError(400, 'Only code threads can be forked.');
+      const latest = store.latestAgentMessage(source.id);
+      if (!latest || latest.id !== messageId) throw new HttpError(400, 'Only the latest reply can be forked: the agent copies its whole session.');
+      if (latest.status === 'streaming') throw new HttpError(400, 'Wait for this reply to finish before forking.');
+      const worker = agent(source.memberIds[0]);
+      if (worker.source !== 'acp') throw new HttpError(400, `${worker.name} cannot fork a session.`);
+      const draft: Conversation = { ...source, id: newId(), title: `${source.title} (fork)` };
+      const forked = await d.acp.forkSession(worker, source, draft);
+      store.insertConversation({
+        id: draft.id, kind: 'code', title: draft.title, avatar: null, memberIds: [worker.id], leadId: null, projectId: source.projectId, hopLimit: 0,
+      });
+      store.saveAcpSession(worker.id, draft.id, forked.sessionId, forked.cwd);
+      store.saveUsage(worker.id, draft.id, store.getAcpSession(worker.id, source.id)!.usage);
+      for (const choice of store.listChoices(worker.id, source.id)) store.saveChoice(worker.id, draft.id, choice);
+      let seenSeq = 0;
+      for (const m of store.messagesAfter(source.id, 0)) {
+        const copy = store.insertMessage({
+          conversationId: draft.id, author: m.author, parts: m.parts, mentions: m.mentions, status: m.status, createdAt: m.createdAt,
+        });
+        if (m.id === latest.id) seenSeq = copy.seq;
+        events.emit({ type: 'message.upsert', message: publicMessage(copy) });
+      }
+      // The forked session holds the thread up to the latest reply; anything after it reaches the agent with the next prompt.
+      store.saveCursor(worker.id, draft.id, seenSeq, []);
+      const created = conversation(draft.id);
+      emitConversation(created);
+      return created;
+    })
+
+    .on('PATCH', '/api/messages/:id', c => {
+      const message = store.getMessage(c.params.id);
+      if (!message) throw new HttpError(404, 'Message not found.');
+      const { chapter } = parse(z.object({ chapter: z.string().trim().min(1).max(CHAPTER_MAX_LENGTH).nullable() }), c.body);
+      return runs.setChapter(message, chapter);
+    })
+
     .on('POST', '/api/conversations/:id/session', c => {
       const conv = conversation(c.params.id);
       const a = member(conv, parse(z.object({ agentId: z.string() }), c.body).agentId);
@@ -186,12 +236,23 @@ export function apiRoutes(d: ApiDeps): Router {
 
     // ---------- agents ----------
 
-    .on('PATCH', '/api/agents/:id', c => {
+    .on('PATCH', '/api/agents/:id', async c => {
       const a = agent(c.params.id);
-      const body = parse(z.object({ name: name.optional(), avatar: avatarSchema.optional(), description: z.string().optional(), hidden: z.boolean().optional() }), c.body);
-      const updated = store.updateAgent(a.id, body);
+      const { subagentModel, ...fields } = parse(z.object({
+        name: name.optional(), avatar: avatarSchema.optional(), description: z.string().optional(), hidden: z.boolean().optional(),
+        subagentModel: z.string().nullable().optional(),
+      }), c.body);
+      if (subagentModel !== undefined) {
+        if (!a.subagentModel) throw new HttpError(400, `${a.name} has no subagent model setting.`);
+        if (subagentModel !== null && !a.subagentModel.choices.some(choice => choice.value === subagentModel)) {
+          throw new HttpError(400, `${JSON.stringify(subagentModel)} is not one of ${a.name}'s models.`);
+        }
+        store.setSubagentModel(a.id, subagentModel);
+      }
+      const updated = store.updateAgent(a.id, fields);
       events.emit({ type: 'agent.upsert', agent: updated });
-      if (body.name) emitConversation(store.updateConversation(a.chatId, { title: body.name }));
+      if (fields.name) emitConversation(store.updateConversation(a.chatId, { title: fields.name }));
+      if (subagentModel !== undefined && subagentModel !== a.subagentModel!.value) await d.acp.restartForSettings(updated);
       return updated;
     })
 

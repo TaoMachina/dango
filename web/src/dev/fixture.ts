@@ -12,6 +12,7 @@ import type {
   Run,
   SessionInfo,
   StateResponse,
+  ThreadInfo,
 } from '../../../shared/types.ts';
 
 const now = Date.now();
@@ -32,6 +33,7 @@ function agent(id: ID, name: string, extra: Partial<Agent>): Agent {
     apiHost: null,
     hidden: false,
     chatId: `c-${id}`,
+    subagentModel: null,
     createdAt: ago(60 * 24 * 7),
     ...extra,
   };
@@ -42,8 +44,17 @@ const agents: Agent[] = [
     avatar: { kind: 'blob', color: '#FF8A3D', shape: 3, face: 1 },
     catalogId: 'claude-code',
     description: 'Writes and reviews code in my projects.',
+    subagentModel: {
+      value: null,
+      choices: [
+        { value: 'opus', name: 'Opus' },
+        { value: 'sonnet', name: 'Sonnet' },
+        { value: 'haiku', name: 'Haiku' },
+      ],
+    },
   }),
-  agent('codex', 'Codex', { avatar: { kind: 'blob', color: '#2B2B2E', shape: 0, face: 2 }, catalogId: 'codex' }),
+  // Codex reports no subagent model setting.
+  agent('codex', 'Codex', { avatar: { kind: 'blob', color: '#2B2B2E', shape: 0, face: 2 }, catalogId: 'codex', subagentModel: null }),
   agent('antigravity', 'Antigravity', {
     avatar: { kind: 'blob', color: '#4C8DF6', shape: 2, face: 0 },
     catalogId: 'antigravity',
@@ -77,6 +88,8 @@ const conversations: Conversation[] = [
   conversation('g-launch', { kind: 'group', title: 'Launch crew', memberIds: ['claude', 'codex'], leadId: 'claude' }),
   conversation('t-composer', { kind: 'code', title: 'Grow the composer with its text', memberIds: ['claude'], projectId: 'p-agentry' }),
   conversation('t-links', { kind: 'code', title: 'Fix stale changelog links', memberIds: ['codex'], projectId: 'p-site' }),
+  // The child thread of a subagent that Claude Code handed to Codex.
+  conversation('t-helper', { kind: 'code', title: 'Review textarea sizing', memberIds: ['codex'], projectId: 'p-agentry' }),
 ];
 
 const projects: Project[] = [
@@ -102,7 +115,7 @@ let seq = 0;
 const id = (prefix: string) => `${prefix}-${++seq}`;
 
 function message(conversationId: ID, author: Message['author'], parts: Part[], minutesAgo: number, extra: Partial<Message> = {}): Message {
-  return { id: id('m'), conversationId, author, parts, mentions: [], runId: null, status: 'done', createdAt: ago(minutesAgo), ...extra };
+  return { id: id('m'), conversationId, author, parts, mentions: [], runId: null, status: 'done', chapter: null, createdAt: ago(minutesAgo), ...extra };
 }
 
 const user = { type: 'user' } as const;
@@ -214,6 +227,17 @@ Details are in [the architecture notes](https://agentclientprotocol.com).`),
     ],
     88,
   ),
+  message('t-composer', user, [text('Look at how the composer sizes itself before changing anything.\nKeep it short.')], 30),
+  message(
+    't-composer',
+    by('claude'),
+    [
+      { type: 'tool', toolCallId: 'tc-a-read', title: 'Read web/src/Composer.tsx', kind: 'read', status: 'completed', locations: ['web/src/Composer.tsx'], content: [{ type: 'text', text: OLD_COMPOSER }] },
+      text('The composer is a fixed one-row `textarea`. Nothing measures its content, so long prompts scroll inside one line.'),
+    ],
+    28,
+    { chapter: 'Composer audit' },
+  ),
   message('t-composer', user, [text('The composer should grow with the text. Fix it.')], 4),
   message(
     't-composer',
@@ -233,6 +257,9 @@ Details are in [the architecture notes](https://agentclientprotocol.com).`),
         locations: [],
         content: [{ type: 'text', text: 'NoteEditor.tsx has the same fixed one-row textarea. No other textareas found.' }],
       },
+      { type: 'subagent', sessionId: 'sub-find', title: 'Find fixed-height textareas', description: 'Search web/src for one-row textareas', state: 'idle', activity: 'Found 2 matches', model: 'Haiku 4.5', agentId: null, conversationId: null },
+      { type: 'subagent', sessionId: 'sub-keyboard', title: 'Check mobile keyboard overlap', description: 'See whether a tall composer hides the last message on phones', state: 'running', activity: 'Reading web/src/app/Shell.tsx', model: 'Sonnet 4.6', agentId: null, conversationId: null },
+      { type: 'subagent', sessionId: 'sub-codex', title: null, description: 'Second opinion on the height cap', state: 'running', activity: 'Running npm run check', model: 'GPT-6.1 Sol', agentId: 'codex', conversationId: 't-helper' },
       {
         type: 'plan',
         entries: [
@@ -262,6 +289,20 @@ Details are in [the architecture notes](https://agentclientprotocol.com).`),
   ),
 ];
 
+messages.push(
+  message('t-helper', user, [text('Review the textarea growth cap in web/src/Composer.tsx. Is 40dvh right on phones?')], 2),
+  message('t-helper', by('codex'), [{ type: 'tool', toolCallId: 'tc-h-check', title: 'npm run check', kind: 'execute', status: 'in_progress', locations: [], content: [] }], 1, { runId: 'run-helper', status: 'streaming' }),
+);
+runs.push({ id: 'run-helper', conversationId: 't-helper', agentId: 'codex', parentRunId: null, triggerMessageId: 'x', depth: 0, status: 'running', error: null, startedAt: ago(1), endedAt: null });
+
+// Where each Code thread works; a thread in a new folder outside git has no branch.
+const branches: Record<ID, string> = { 't-composer': 'feat/composer-grow', 't-helper': 'feat/composer-grow', 't-links': 'main' };
+
+function threadInfo(c: Conversation): ThreadInfo {
+  const project = projects.find((p) => p.id === c.projectId);
+  return { environment: 'Workstation', folder: project?.path ?? null, branch: branches[c.id] ?? null };
+}
+
 function refreshConversation(c: Conversation) {
   const last = messages.filter((m) => m.conversationId === c.id).at(-1);
   if (!last) return;
@@ -272,6 +313,7 @@ function refreshConversation(c: Conversation) {
 }
 conversations.forEach(refreshConversation);
 conversations.find((c) => c.id === 't-composer')!.activeRuns = 1;
+conversations.find((c) => c.id === 't-helper')!.activeRuns = 1;
 
 type Options = SessionInfo['options'];
 
@@ -521,6 +563,27 @@ export async function fixtureFetch(url: string, init: RequestInit): Promise<Resp
     emit({ type: 'session.upsert', session: structuredClone(s) });
     return json(structuredClone(s));
   }
+  if (method === 'GET' && (m = path.match(/^\/api\/conversations\/([^/]+)\/info$/))) {
+    return json(threadInfo(conversations.find((x) => x.id === m![1])!));
+  }
+  if (method === 'POST' && (m = path.match(/^\/api\/conversations\/([^/]+)\/fork$/))) {
+    const source = conversations.find((x) => x.id === m![1])!;
+    const fork = conversation(id('t'), { kind: 'code', title: `${source.title} (fork)`, memberIds: source.memberIds, projectId: source.projectId });
+    const history = messages.filter((x) => x.conversationId === source.id);
+    const end = history.findIndex((x) => x.id === body.messageId) + 1;
+    for (const x of history.slice(0, end)) messages.push({ ...structuredClone(x), id: id('m'), conversationId: fork.id, chapter: null });
+    conversations.push(fork);
+    refreshConversation(fork);
+    if (branches[source.id]) branches[fork.id] = branches[source.id];
+    emit({ type: 'conversation.upsert', conversation: structuredClone(fork) });
+    return json(structuredClone(fork));
+  }
+  if (method === 'PATCH' && (m = path.match(/^\/api\/messages\/([^/]+)$/))) {
+    const x = messages.find((y) => y.id === m![1])!;
+    x.chapter = body.chapter as string | null;
+    emit({ type: 'message.upsert', message: structuredClone(x) });
+    return json(structuredClone(x));
+  }
   if ((m = path.match(/^\/api\/conversations\/([^/]+)$/))) {
     const index = conversations.findIndex((x) => x.id === m![1]);
     if (method === 'DELETE') {
@@ -554,7 +617,9 @@ export async function fixtureFetch(url: string, init: RequestInit): Promise<Resp
   }
   if ((m = path.match(/^\/api\/agents\/([^/]+)$/))) {
     const a = agents.find((x) => x.id === m![1])!;
-    Object.assign(a, body);
+    const { subagentModel, ...rest } = body;
+    if (subagentModel !== undefined) a.subagentModel = { ...a.subagentModel!, value: subagentModel as string | null };
+    Object.assign(a, rest);
     return json(structuredClone(a));
   }
   if (method === 'POST' && path === '/api/fs/pick-folder') return json({ path: 'D:\\projects\\notes' });

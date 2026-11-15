@@ -7,6 +7,7 @@ import { unifiedDiff } from '../lib/diff.ts';
 export type ToolPart = Extract<Part, { type: 'tool' }>;
 export type PlanPart = Extract<Part, { type: 'plan' }>;
 export type PermissionPartData = Extract<Part, { type: 'permission' }>;
+export type LiveSubagent = Extract<Part, { type: 'subagent' }>;
 
 export type SubagentStatus = 'running' | 'completed' | 'failed' | 'stopped' | 'unreported';
 
@@ -20,7 +21,8 @@ export interface Subagent {
 export type Entry =
   | { kind: 'tool'; part: ToolPart }
   | { kind: 'thought'; text: string }
-  | { kind: 'subagent'; agent: Subagent };
+  | { kind: 'subagent'; agent: Subagent }
+  | { kind: 'live'; part: LiveSubagent }; // a subagent the agent reported through ACP
 
 export type Row =
   | { kind: 'text'; text: string }
@@ -125,7 +127,9 @@ function findSubagents(parts: Part[], catalogId: string | null, streaming: boole
 /** The rows of one agent message. Tool calls and thoughts between other parts form one work-log group. */
 export function messageRows(message: Message, catalogId: string | null): Row[] {
   const streaming = message.status === 'streaming';
-  const { byPart, firstIndex } = findSubagents(message.parts, catalogId, streaming);
+  // A message with reported subagents shows those; reading them again from tool titles would show each twice.
+  const reported = message.parts.some((p) => p.type === 'subagent');
+  const { byPart, firstIndex } = findSubagents(reported ? [] : message.parts, catalogId, streaming);
   const rows: Row[] = [];
   const work = () => {
     const last = rows.at(-1);
@@ -148,6 +152,9 @@ export function messageRows(message: Message, catalogId: string | null): Row[] {
         else if (firstIndex.get(agent) === index) work().push({ kind: 'subagent', agent });
         return;
       }
+      case 'subagent':
+        work().push({ kind: 'live', part });
+        return;
       case 'plan':
         rows.push({ kind: 'plan', part });
         return;
@@ -168,6 +175,7 @@ export function messageRows(message: Message, catalogId: string | null): Row[] {
 export function isActive(entry: Entry, streaming: boolean) {
   if (!streaming) return false;
   if (entry.kind === 'subagent') return entry.agent.status === 'running';
+  if (entry.kind === 'live') return entry.part.state === 'running';
   if (entry.kind === 'tool') return entry.part.status === 'pending' || entry.part.status === 'in_progress';
   return false;
 }
@@ -199,7 +207,7 @@ export function summarize(entries: Entry[]): string | null {
       failed++;
       continue;
     }
-    if (entry.kind === 'subagent') {
+    if (entry.kind === 'subagent' || entry.kind === 'live') {
       counts.subagent++;
       continue;
     }
@@ -272,6 +280,34 @@ export function fileChanges(messages: Message[]): FileChange[] {
     }
   }
   return [...byPath.values()];
+}
+
+/** Subagents the agent reported in this thread, newest turn first; a later report of the same session replaces the earlier one. */
+export function liveSubagents(messages: Message[]): LiveSubagent[] {
+  const bySession = new Map<string, LiveSubagent>();
+  for (const message of [...messages].reverse()) {
+    for (const part of message.parts) if (part.type === 'subagent' && !bySession.has(part.sessionId)) bySession.set(part.sessionId, part);
+  }
+  return [...bySession.values()];
+}
+
+/** Label and dot color for each state a reported subagent can be in. */
+export const LIVE_STATE: Record<LiveSubagent['state'], { label: string; dot: string }> = {
+  running: { label: 'Running', dot: 'bg-warn' },
+  // ACP idle: the subagent finished its turn and could be resumed.
+  idle: { label: 'Finished', dot: 'bg-success' },
+  requires_action: { label: 'Needs input', dot: 'bg-danger' },
+  unknown: { label: 'Unknown', dot: 'bg-faint' },
+};
+
+/** A subagent's name: its own title, else the Agentry agent acting as it. */
+export function liveTitle(part: LiveSubagent, agentName: string | undefined) {
+  return part.title ?? agentName ?? 'Subagent';
+}
+
+/** Messages pinned as chapters, in thread order. */
+export function chapters(messages: Message[]) {
+  return messages.filter((m) => m.chapter !== null);
 }
 
 /** Subagents across the thread, oldest first. */

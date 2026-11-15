@@ -15,6 +15,8 @@ export interface CatalogEntry {
   detect: string[];
   // How to start the agent as an ACP server over stdio. Resolved when the agent starts.
   launch: () => Launch;
+  // The environment that sets the model of the agent's own subagents, for agents whose runtime reads one at start.
+  subagentModelEnv?: (model: string) => Record<string, string>;
 }
 
 const require = createRequire(import.meta.url);
@@ -43,9 +45,24 @@ function gitBashEnv(): Record<string, string> {
 
 const bin = (command: string, ...args: string[]) => () => ({ command, args });
 
+// Claude Code reads CLAUDE_CODE_SUBAGENT_MODEL for the subagents it starts
+// (the bundled @anthropic-ai/claude-agent-sdk-win32-x64/claude.exe: "inherit" or unset keeps the main model).
+const claudeSubagentModel = (model: string) => ({ CLAUDE_CODE_SUBAGENT_MODEL: model });
+
+// codex-acp passes the CODEX_CONFIG JSON to every Codex thread as config overrides (codex-acp dist/index.js, startAcpServer),
+// and Codex's [agents] table has default_subagent_model (AgentsToml in @openai/codex-win32-x64's codex.exe).
+// A CODEX_CONFIG the person set already is kept.
+function codexSubagentModel(model: string) {
+  const config = process.env.CODEX_CONFIG ? JSON.parse(process.env.CODEX_CONFIG) : {};
+  return { CODEX_CONFIG: JSON.stringify({ ...config, agents: { ...config.agents, default_subagent_model: model } }) };
+}
+
 export const builtInCatalog: CatalogEntry[] = [
-  { id: 'claude-code', runtimeLabel: 'Claude Code', detect: ['claude'], launch: () => ({ ...adapter('@agentclientprotocol/claude-agent-acp'), env: gitBashEnv() }) },
-  { id: 'codex', runtimeLabel: 'Codex', detect: ['codex'], launch: () => adapter('@agentclientprotocol/codex-acp') },
+  {
+    id: 'claude-code', runtimeLabel: 'Claude Code', detect: ['claude'],
+    launch: () => ({ ...adapter('@agentclientprotocol/claude-agent-acp'), env: gitBashEnv() }), subagentModelEnv: claudeSubagentModel,
+  },
+  { id: 'codex', runtimeLabel: 'Codex', detect: ['codex'], launch: () => adapter('@agentclientprotocol/codex-acp'), subagentModelEnv: codexSubagentModel },
   // Antigravity CLI replaced Gemini CLI on 2026-06-18; 'agy acp' is its ACP server (release 1.5.0).
   { id: 'antigravity', runtimeLabel: 'Antigravity', detect: ['agy'], launch: bin('agy', 'acp') },
   { id: 'opencode', runtimeLabel: 'OpenCode', detect: ['opencode'], launch: bin('opencode', 'acp') },
