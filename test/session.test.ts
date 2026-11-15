@@ -33,6 +33,9 @@ test('projects by name are created under ~/Agentry/projects; picked folders must
   assert.ok(existsSync(dir));
   assert.equal((await t.raw('POST', '/api/projects', { cookie: t.cookie }, { name: 'demo' })).status, 409);
   assert.equal((await t.raw('POST', '/api/projects', { cookie: t.cookie }, { name: '../escape' })).status, 400);
+  assert.equal((await t.raw('POST', '/api/projects', { cookie: t.cookie }, { name: 'a\\b' })).status, 400);
+  // "." would register the projects folder itself.
+  assert.equal((await t.raw('POST', '/api/projects', { cookie: t.cookie }, { name: '.' })).status, 400);
   assert.equal((await t.raw('POST', '/api/projects', { cookie: t.cookie }, { path: join(t.hub.paths.dir, 'missing') })).status, 400);
   const picked = join(t.hub.paths.dir, 'picked');
   mkdirSync(picked);

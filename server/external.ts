@@ -104,9 +104,11 @@ export class External implements Executor {
   }
 
   hello(agentId: ID, input: z.infer<typeof helloSchema>) {
+    // The agent names itself while it still has the placeholder name; after that the person's name and description stay.
     // An agent without a name of its own goes by its product name; with neither it stays "New agent".
-    const name = input.name ?? input.runtime;
-    let agent = this.store.updateAgent(agentId, { name, runtimeLabel: input.runtime, description: input.description });
+    const first = this.store.getAgent(agentId)!.name === NEW_AGENT_NAME;
+    const name = first ? input.name ?? input.runtime : undefined;
+    let agent = this.store.updateAgent(agentId, { name, runtimeLabel: input.runtime, description: first ? input.description : undefined });
     if (name) this.store.updateConversation(agent.chatId, { title: name });
     this.markPolled(agentId);
     agent = this.store.getAgent(agentId)!;

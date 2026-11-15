@@ -22,6 +22,18 @@ export function messageText(parts: Part[]): string {
   return parts.filter(p => p.type === 'text').map(p => p.text).join('\n\n');
 }
 
+// A reply that ended before the agent closed its steps: an open tool call failed, a running subagent is shown idle
+// with `activity`, and an unanswered permission is cancelled. A delegated helper whose run goes on reports its own end,
+// so its part is closed only when `delegated` is set (after a restart nothing else will).
+export function closeOpenParts(parts: Part[], activity: string, delegated: boolean) {
+  parts.forEach((part, i) => {
+    if (part.type === 'tool' && (part.status === 'pending' || part.status === 'in_progress')) parts[i] = { ...part, status: 'failed' };
+    const open = part.type === 'subagent' && (part.state === 'running' || part.state === 'requires_action') && (delegated || part.agentId === null);
+    if (open) parts[i] = { ...part, state: 'idle', activity };
+    if (part.type === 'permission' && part.outcome === null) parts[i] = { ...part, outcome: { cancelled: true } };
+  });
+}
+
 export class Store {
   db: DatabaseSync;
   catalog: CatalogEntry[];
@@ -333,6 +345,7 @@ export class Store {
     this.db.prepare(`UPDATE runs SET status = 'error', error = 'Agentry restarted before this run finished.', ended_at = ? WHERE status IN ('queued', 'running')`).run(at);
     for (const r of this.db.prepare(`SELECT * FROM messages WHERE status = 'streaming'`).all() as Row[]) {
       const m = this.messageFrom(r);
+      closeOpenParts(m.parts, 'Interrupted', true);
       m.parts.push({ type: 'error', text: 'Agentry restarted before this reply finished.' });
       m.status = 'error';
       this.saveMessage(m);

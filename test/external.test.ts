@@ -40,3 +40,13 @@ test('an invited agent joins under its own name, fetches its inbox and replies',
   assert.equal(textOf(reply), 'Found them.');
   assert.equal((await t.raw('POST', '/agent-api/reply', auth, { runId: inbox[0].runId, text: 'again' })).status, 404);
 });
+
+test('a later hello keeps the name and description the person chose', async () => {
+  const { instruction } = await t.api<{ instruction: string }>('POST', '/api/agents/external', {});
+  const auth = { authorization: `Bearer ${instruction.match(/Your token: ([0-9a-f]+)/)![1]}`, 'content-type': 'application/json' };
+  const hello = await t.raw('POST', '/agent-api/hello', auth, { name: 'Ranger', runtime: 'Custom', description: 'Its own line' });
+  await t.api('PATCH', `/api/agents/${hello.body.agent.id}`, { name: 'Scout', description: 'My scout' });
+  await t.raw('POST', '/agent-api/hello', auth, { name: 'Ranger', runtime: 'Custom 2', description: 'Its own line' });
+  const agent = (await t.api<{ agents: Agent[] }>('GET', '/api/state')).agents.find(a => a.id === hello.body.agent.id)!;
+  assert.deepEqual([agent.name, agent.description, agent.runtimeLabel], ['Scout', 'My scout', 'Custom 2']);
+});

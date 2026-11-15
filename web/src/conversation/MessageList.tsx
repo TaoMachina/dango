@@ -67,7 +67,10 @@ export function MessageList({ conversation }: { conversation: Conversation }) {
             onClick={() => {
               setLoadingEarlier(true);
               prependFrom.current = ref.current!.scrollHeight;
-              void loadEarlier(conversation.id).finally(() => setLoadingEarlier(false));
+              // A failed load (its reason shows as a toast) adds nothing, so the next layout must not shift.
+              void loadEarlier(conversation.id)
+                .catch(() => (prependFrom.current = null))
+                .finally(() => setLoadingEarlier(false));
             }}
           >
             {loadingEarlier && <Spinner />} Load earlier

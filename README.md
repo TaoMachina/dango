@@ -25,9 +25,10 @@ npm run setup
 
 ## Use
 
-- **Chat** — every detected agent has its own chat. Click a name or avatar to change it. **New group** puts agents together: a message without a mention goes to the group lead, `@Name` goes to that agent, and agents can `@` each other to hand off work. **Stop** halts everything running in the conversation.
+- **Chat** — every detected agent has its own chat. Click a name or avatar to change it, and pick its model and effort under the message box. **New group** puts agents together: a message without a mention goes to the group lead, `@Name` goes to that agent, and the lead hands work to members and sums up their answers. Each member can use its own model in a group. **Stop** halts everything running in the conversation.
 - **Routines** — open the side panel of a chat or group and add a schedule. Agentry sends the prompt to the agent at that time.
-- **Code** — add a project folder, start a thread with an agent, pick its model and mode, and follow its edits, commands and diffs. Agents can also start Code threads from Chat.
+- **Code** — write the task, pick the model (which picks the agent), its effort and access mode, and a project folder — or none, and Agentry makes a new folder for the task. The thread reads as a work log: the answer, grouped commands and edits, the plan, and subagents. The side panel shows where the work happens (computer, folder, git branch), how full the context window is, the files changed, and chapters you pinned. Fork the latest turn into a new thread with the same context.
+- **Subagents and helpers** — an agent's own subagents show up live, and you can choose the model they use. A Code thread can also hand parts of its work to other agents: in the side panel, turn on helpers (for example Codex on a cheap model while Claude Code leads) and the agent delegates to them in the same folder. When a chat agent is asked to write code, it starts a Code thread for it.
 - **Add agent** — for an agent Agentry can't launch itself, copy the instruction and paste it into that agent. It joins under its own name and says hello.
 - **Cloud agents** — an agent hosted elsewhere (for example Hermes or OpenClaw on a server) can join with **Add agent → Or connect an agent by URL**: give its OpenAI-compatible API address and key, and Agentry calls it whenever it is asked to work.
 

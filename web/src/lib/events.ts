@@ -1,5 +1,5 @@
 import type { HubEvent, Part } from '../../../shared/types.ts';
-import { loadState, select, storeAgentOptions, storeSession, upsertMessage } from './actions.ts';
+import { loadState, select, storeAgentOptions, storeSession, streamReconnected, upsertMessage } from './actions.ts';
 import { fixtureMode } from './api.ts';
 import { getState, remove, setState, updateThread, upsert } from './store.ts';
 
@@ -8,6 +8,7 @@ export function applyEvent(event: HubEvent) {
     case 'hello':
       // Events may have been missed while disconnected: reload state and drop cached threads.
       // Open conversations refetch their messages when their thread disappears.
+      streamReconnected();
       setState(() => ({ threads: {} }));
       void loadState();
       return;
@@ -52,7 +53,8 @@ export function applyEvent(event: HubEvent) {
 function updatePart(conversationId: string, messageId: string, index: number, recipe: (part: Part) => Part) {
   updateThread(conversationId, (t) => {
     const at = t.messages.findIndex((m) => m.id === messageId);
-    // The message arrives with message.upsert first; before the thread is fetched it is not cached.
+    // The message arrives with message.upsert first. One that started before its thread was fetched comes with the
+    // fetched page; appends missed meanwhile arrive in the hub's full upsert at the end of its run.
     if (at < 0) return t;
     const message = t.messages[at];
     const parts = message.parts.slice();

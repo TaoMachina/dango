@@ -41,7 +41,8 @@ export function addFolder(store: Store, events: Events, path: string): Project {
 // POST /api/projects {name}: a new folder under ~/Agentry/projects.
 export function createNamed(store: Store, events: Events, dir: string, name: string): Project {
   const trimmed = name.trim();
-  if (!trimmed || /[\/]/.test(trimmed) || trimmed.includes('..')) throw new HttpError(400, 'A project name cannot contain / or \ or "..".');
+  // "." would name the projects folder itself.
+  if (!trimmed || trimmed === '.' || /[\/\\]/.test(trimmed) || trimmed.includes('..')) throw new HttpError(400, 'A project name cannot be "." or contain /, \\ or "..".');
   const full = join(dir, trimmed);
   if (projectAt(store, full)) throw new HttpError(409, `A project already uses ${full}.`);
   mkdirSync(full, { recursive: true });

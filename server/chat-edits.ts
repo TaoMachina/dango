@@ -12,11 +12,11 @@ const key = (path: string) => (process.platform === 'win32' ? path.toLowerCase()
 
 export const isInside = (path: string, dir: string) => key(path) === key(dir) || key(path).startsWith(key(dir.endsWith(sep) ? dir : dir + sep));
 
-/** Absolute paths of files that finished tool calls wrote, outside the given scratch folders. */
+/** Absolute paths of files that completed tool calls wrote, outside the given scratch folders. A call that never completed may not have written. */
 export function editedPaths(parts: Part[], ignore: string[]): string[] {
   const paths = new Map<string, string>();
   for (const part of parts) {
-    if (part.type !== 'tool' || part.status === 'failed') continue;
+    if (part.type !== 'tool' || part.status !== 'completed') continue;
     const diffs = part.content.flatMap(c => (c.type === 'diff' ? [c.path] : []));
     const files = diffs.length > 0 ? diffs : WRITE_KINDS.has(part.kind) ? part.locations : [];
     for (const file of files) {

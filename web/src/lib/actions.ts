@@ -17,7 +17,7 @@ import type {
   ThreadInfo,
 } from '../../../shared/types.ts';
 import { api } from './api.ts';
-import { byId, getState, sessionKey, setState, updateThread, updateUI, upsert, type Module } from './store.ts';
+import { byId, endFetch, getState, sessionKey, setState, startFetch, updateThread, updateUI, upsert, type Module } from './store.ts';
 
 // ---------- Navigation ----------
 
@@ -100,20 +100,36 @@ interface MessagesResponse {
 }
 
 export async function openThread(conversationId: ID) {
-  const data = await api<MessagesResponse>('GET', `/api/conversations/${conversationId}/messages`);
-  setState((s) => {
-    // Keep messages that arrived over SSE while the request was in flight.
-    const live = s.threads[conversationId]?.messages ?? [];
-    const ids = new Set(data.messages.map((m) => m.id));
-    const messages = data.messages.map((m) => live.find((l) => l.id === m.id) ?? m);
-    for (const m of live) if (!ids.has(m.id)) messages.push(m);
-    return {
-      threads: {
-        ...s.threads,
-        [conversationId]: { messages, runs: byId(data.runs), hasMore: data.hasMore },
-      },
-    };
-  });
+  const stream = streamGeneration;
+  startFetch(conversationId);
+  let data: MessagesResponse;
+  try {
+    data = await api<MessagesResponse>('GET', `/api/conversations/${conversationId}/messages`);
+  } catch (error) {
+    endFetch(conversationId);
+    throw error;
+  }
+  // Messages and runs that arrived over SSE while the request was in flight. A message's upsert carries all of it,
+  // so its copy here is at least as new as the fetched one.
+  const live = endFetch(conversationId);
+  // The event stream reconnected meanwhile, so this page may lack events from the gap.
+  if (stream !== streamGeneration) return openThread(conversationId);
+  const ids = new Set(data.messages.map((m) => m.id));
+  const messages = data.messages.map((m) => live.messages.find((l) => l.id === m.id) ?? m);
+  for (const m of live.messages) if (!ids.has(m.id)) messages.push(m);
+  setState((s) => ({
+    threads: {
+      ...s.threads,
+      [conversationId]: { messages, runs: { ...byId(data.runs), ...live.runs }, hasMore: data.hasMore },
+    },
+  }));
+}
+
+// Counts event-stream connections; each 'hello' drops cached threads, so a page fetched before it is fetched again.
+let streamGeneration = 0;
+
+export function streamReconnected() {
+  streamGeneration++;
 }
 
 export async function loadEarlier(conversationId: ID) {

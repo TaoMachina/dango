@@ -1,4 +1,4 @@
-// A small ACP agent for tests. Usage: node fake-agent.ts <name> [mentionTarget] [sessionDelayMs]
+// A small ACP agent for tests. Usage: node fake-agent.ts <name> [mentionTarget] [sessionDelayMs] [restore]
 // The last line of the prompt selects behavior, so Agentry's context text before it triggers nothing:
 //   "tool"       -> reports a tool call with a diff
 //   "permission" -> asks for permission and replies with the chosen option id
@@ -10,18 +10,24 @@
 //   "history"    -> also replies with the earlier prompt lines of this session, joined by " | "
 //   "env"        -> also replies with FAKE_SUBAGENT_MODEL from the agent's environment
 //   "later"      -> finishes after LATER_MS, longer than the wait budget test/delegate.test.ts gives the hub
+//   "stuck"      -> starts a tool call and a subagent, waits for cancel, then reports both finished and stops
+//   "relay"      -> replies "@<mentionTarget>" on its own line, then the prompt's last line, so a member that echoes it mentions no one
+//   "fail-<name>" -> the agent with that name fails its turn after LATER_MS
+//   "closed"     -> also replies with the sessions closed with session/close, joined by ","
 // session/fork copies a session's settings and history; session/resume reopens a session this process knows.
+// restore "load-fails" offers session/load instead of session/resume, and every load fails.
 // Each finished turn reports usage_update with 100 more tokens used of 1000.
 // Every reply starts with "<name> heard: <last line of the prompt>", so group notes are not echoed.
 import { Readable, Writable } from 'node:stream';
 import * as acp from '@agentclientprotocol/sdk/unstable';
 
-const [name = 'Fake', target = '', delay = '0'] = process.argv.slice(2);
+const [name = 'Fake', target = '', delay = '0', restore = 'resume'] = process.argv.slice(2);
 const cancels = new Map<string, () => void>();
 const values = new Map<string, Record<string, string | boolean>>();
 const turns = new Map<string, number>();
 const history = new Map<string, string[]>();
 let sessions = 0;
+const closed: string[] = [];
 // test/delegate.test.ts waits 300 ms for a helper; 1 s is safely longer.
 const LATER_MS = 1000;
 
@@ -36,8 +42,18 @@ const configOptions = (v: Record<string, string | boolean>) => [
 
 const app = acp.agent({ name })
   .onRequest('initialize', () => ({
-    protocolVersion: acp.PROTOCOL_VERSION, agentCapabilities: { loadSession: false, sessionCapabilities: { fork: {}, resume: {} } },
+    protocolVersion: acp.PROTOCOL_VERSION,
+    agentCapabilities: restore === 'load-fails'
+      ? { loadSession: true, sessionCapabilities: { fork: {}, close: {} } }
+      : { loadSession: false, sessionCapabilities: { fork: {}, resume: {}, close: {} } },
   }))
+  .onRequest('session/load', ({ params }) => {
+    throw new Error(`No session ${params.sessionId}`);
+  })
+  .onRequest('session/close', ({ params }) => {
+    closed.push(params.sessionId);
+    return {};
+  })
   .onRequest('session/new', async () => {
     await new Promise(resolve => setTimeout(resolve, Number(delay)));
     const sessionId = `${name}-session-${++sessions}`;
@@ -106,6 +122,22 @@ const app = acp.agent({ name })
       await say(` chose ${response.outcome.outcome === 'selected' ? response.outcome.optionId : 'cancelled'}`);
     }
     if (text.includes('chain') && target) await say(` @${target} chain`);
+    if (text.includes('relay') && target) await say(`\n@${target}\n${text}`);
+    if (text.includes('closed')) await say(` closed=${closed.join(',')}`);
+    if (text.includes(`fail-${name}`)) {
+      await new Promise(resolve => setTimeout(resolve, LATER_MS));
+      throw new Error(`${name} failed`);
+    }
+    if (text.includes('stuck')) {
+      const child = `${sessionId}-stuck`;
+      const update = (u: acp.SessionUpdate) => client.notify('session/update', { sessionId, update: u });
+      await update({ sessionUpdate: 'tool_call', toolCallId: 's1', title: 'Run tests', kind: 'execute', status: 'in_progress' });
+      await update({ sessionUpdate: 'subagent_update', sessionId: child, title: 'Checker', state: { state: 'running' } });
+      await new Promise<void>(resolve => cancels.set(sessionId, resolve));
+      await update({ sessionUpdate: 'tool_call_update', toolCallId: 's1', status: 'completed' });
+      await update({ sessionUpdate: 'subagent_update', sessionId: child, state: { state: 'idle' } });
+      return { stopReason: 'cancelled' as const };
+    }
     if (text.includes('later')) {
       await new Promise(resolve => setTimeout(resolve, LATER_MS));
       await say(' done later');

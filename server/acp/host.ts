@@ -214,8 +214,12 @@ export class AcpHost implements Executor {
         session.sessionId = stored.sessionId;
         session.loading = true;
         this.bySessionId.set(stored.sessionId, session);
-        session.state = stateFrom(await proc.connection.agent.request('session/load', { sessionId: stored.sessionId, cwd: stored.cwd, mcpServers, systemPrompt }));
-        session.loading = false;
+        try {
+          session.state = stateFrom(await proc.connection.agent.request('session/load', { sessionId: stored.sessionId, cwd: stored.cwd, mcpServers, systemPrompt }));
+        } finally {
+          // A failed load falls back to a new session below, whose updates must reach the conversation.
+          session.loading = false;
+        }
       } else if (stored) {
         notice = `${agent.name} started a new session and does not remember earlier messages here.`;
       }
@@ -496,6 +500,28 @@ export class AcpHost implements Executor {
     } catch (error) {
       if (error instanceof acp.RequestError && error.code === AUTH_REQUIRED) throw this.needsAuth(agent);
       throw new Error(`${agent.runtimeLabel} could not fork the session: ${errorText(error)}`);
+    }
+  }
+
+  // A deleted conversation's sessions: the agent closes them when it supports session/close, and the hub drops its references.
+  forget(conversationId: ID) {
+    for (const [key, opening] of this.sessions) {
+      if (!key.endsWith(`:${conversationId}`)) continue;
+      this.sessions.delete(key);
+      this.readySessions.delete(key);
+      opening.then(
+        session => {
+          // A session still opening was marked ready after the deletion.
+          this.readySessions.delete(key);
+          this.bySessionId.delete(session.sessionId);
+          for (const [id, child] of this.children) if (child.root === session) this.children.delete(id);
+          if (!session.process.init?.agentCapabilities?.sessionCapabilities?.close) return;
+          session.process.connection.agent.request('session/close', { sessionId: session.sessionId }).catch(error => {
+            console.error(`${this.o.store.getAgent(session.agentId)?.runtimeLabel ?? 'The agent'} could not close session ${session.sessionId}: ${errorText(error)}`);
+          });
+        },
+        () => {}, // openSession reports its own failure on the agent's status.
+      );
     }
   }
 

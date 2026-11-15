@@ -3,11 +3,11 @@ import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import type { Part } from '../shared/types.ts';
+import type { Part, ToolStatus } from '../shared/types.ts';
 import { editedPaths, fileList, projectFolder } from '../server/chat-edits.ts';
 
-const tool = (kind: string, paths: string[], diff = false): Part => ({
-  type: 'tool', toolCallId: kind, title: kind, kind, status: 'completed',
+const tool = (kind: string, paths: string[], diff = false, status: ToolStatus = 'completed'): Part => ({
+  type: 'tool', toolCallId: kind, title: kind, kind, status,
   locations: diff ? [] : paths,
   content: diff ? paths.map(path => ({ type: 'diff' as const, path, oldText: null, newText: 'x' })) : [],
 });
@@ -20,6 +20,9 @@ test('edited files come from diffs and write tools, never from reads or the scra
     tool('edit', [join(root, 'app', 'index.html')], true),
     tool('delete', [join(root, 'app', 'old.css')]),
     tool('edit', [join(scratch, 'note.txt')], true),
+    // A call that never completed (still open when its run was stopped, or failed) may not have written.
+    tool('edit', [join(root, 'app', 'draft.css')], true, 'in_progress'),
+    tool('move', [join(root, 'app', 'moved.css')], false, 'failed'),
   ];
   assert.deepEqual(editedPaths(parts, [scratch]), [join(root, 'app', 'index.html'), join(root, 'app', 'old.css')]);
 });

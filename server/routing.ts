@@ -3,7 +3,7 @@ import type { Events } from './events.ts';
 import { editedPaths, fileList, isInside, projectFolder } from './chat-edits.ts';
 import { folderProject } from './projects.ts';
 import { existsSync } from 'node:fs';
-import { messageText, newId, now, publicMessage, type Store, type StoredMessage } from './store.ts';
+import { closeOpenParts, messageText, newId, now, publicMessage, type Store, type StoredMessage } from './store.ts';
 
 export type RunOutcome = { status: 'done' | 'stopped'; note?: string };
 export type PermissionAnswer = { optionId: string } | { cancelled: true };
@@ -174,12 +174,16 @@ export class LiveRun {
     this.finished = true;
     const { store } = this.runs;
     const message = this.message;
+    // The group as it is now: a member removed during this run is no longer handed work.
+    const conversation = store.getConversation(this.conversation.id);
     let mentions: ID[] = [];
     if (message) {
+      // The agent's closing updates for its open steps arrive after the run ended, or never.
+      if (status !== 'done') closeOpenParts(message.parts, status === 'stopped' ? 'Stopped' : 'Interrupted', false);
       if (note) message.parts.push({ type: 'error', text: note });
       message.status = status;
-      if (this.conversation.kind === 'group') {
-        const others = this.runs.members(this.conversation).filter(a => a.id !== this.agent.id);
+      if (conversation?.kind === 'group') {
+        const others = this.runs.members(conversation).filter(a => a.id !== this.agent.id);
         mentions = findMentions(messageText(message.parts), others);
         message.mentions = mentions;
       }
@@ -195,11 +199,11 @@ export class LiveRun {
     this.runs.reportToRequester(this.conversation, this.agent, status);
     // Files edited from a chat or group belong to a project too; whatever the run's outcome, the edits happened.
     if (message && this.conversation.kind !== 'code') this.runs.noteChatEdits(this.conversation, this.agent, message.parts);
-    const conversation = store.getConversation(this.conversation.id);
-    if (status !== 'done' || !message || !conversation || conversation.kind !== 'group') return;
+    // A run the person stopped ends the request there.
+    if (this.stopped || !message || !conversation || conversation.kind !== 'group') return;
     const withinLimit = this.run.depth + 1 <= conversation.hopLimit;
-    // An agent's @mention hands work to that member, up to the group's hop limit.
-    if (mentions.length > 0) {
+    // An agent's @mention in a finished reply hands work to that member, up to the group's hop limit.
+    if (status === 'done' && mentions.length > 0) {
       if (withinLimit) {
         for (const agentId of mentions) {
           this.runs.startRun({ conversationId: conversation.id, agentId, triggerMessageId: message.id, parentRunId: this.run.id, depth: this.run.depth + 1 });
@@ -210,11 +214,13 @@ export class LiveRun {
       }
       return;
     }
-    // A member the lead asked has answered: once every member from that handoff is done, the lead reviews and replies to the person.
+    // A member the lead asked has finished: once every member from that handoff has finished and at least one answered,
+    // the lead reviews and replies to the person. It sees any member's error in the conversation.
     const parent = this.run.parentRunId ? store.getRun(this.run.parentRunId) : null;
     const lead = conversation.leadId ?? conversation.memberIds[0];
     if (!parent || parent.agentId !== lead || this.agent.id === lead || !withinLimit) return;
-    if (store.childRuns(parent.id).some(r => r.status === 'queued' || r.status === 'running')) return;
+    const handoff = store.childRuns(parent.id);
+    if (handoff.some(r => r.status === 'queued' || r.status === 'running') || !handoff.some(r => r.status === 'done')) return;
     this.runs.startRun({ conversationId: conversation.id, agentId: lead, triggerMessageId: message.id, parentRunId: this.run.id, depth: this.run.depth + 1 });
   }
 }
@@ -300,6 +306,10 @@ export class Runs {
   }
 
   startRun(r: { conversationId: ID; agentId: ID; triggerMessageId: ID; parentRunId: ID | null; depth: number; prompt?: string }): StoredRun {
+    const conversation = this.store.getConversation(r.conversationId)!;
+    if (conversation.kind === 'group' && !conversation.memberIds.includes(r.agentId)) {
+      throw new Error(`${this.store.authorName({ type: 'agent', agentId: r.agentId })} is not a member of ${conversation.title}.`);
+    }
     const run = this.store.insertRun({ ...r, prompt: r.prompt ?? null });
     this.emitRun(run);
     this.emitConversation(run.conversationId);
@@ -352,17 +362,25 @@ export class Runs {
 
   // Stop cancels every queued and active run in the conversation and in the threads it delegated to. A stopped run never resumes.
   stop(conversationId: ID) {
-    for (const run of this.store.activeRuns(conversationId)) {
-      const live = this.lives.get(run.id);
-      if (live) {
-        live.stop();
-      } else {
-        this.emitRun(this.store.updateRun(run.id, { status: 'stopped', endedAt: now() }));
-        this.ended(run.id);
-      }
-    }
+    for (const run of this.store.activeRuns(conversationId)) this.stopRun(run);
     for (const child of this.store.childConversations(conversationId)) this.stop(child);
     this.emitConversation(conversationId);
+  }
+
+  // Stops one agent's queued and active runs in a conversation, for a member who left it.
+  stopAgent(conversationId: ID, agentId: ID) {
+    for (const run of this.store.activeRuns(conversationId)) if (run.agentId === agentId) this.stopRun(run);
+    this.emitConversation(conversationId);
+  }
+
+  private stopRun(run: StoredRun) {
+    const live = this.lives.get(run.id);
+    if (live) {
+      live.stop();
+    } else {
+      this.emitRun(this.store.updateRun(run.id, { status: 'stopped', endedAt: now() }));
+      this.ended(run.id);
+    }
   }
 
   stopAll() {

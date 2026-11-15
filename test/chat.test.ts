@@ -81,3 +81,19 @@ test('stop cancels the run and ignores chunks that arrive afterwards', async () 
   assert.equal(stored.status, 'stopped');
   assert.equal(textOf(stored), 'One heard: slow');
 });
+
+test('stop closes the reply\'s open tool call and subagent, and their late updates change nothing', async () => {
+  await t.api('POST', `/api/conversations/${one.chatId}/messages`, { text: 'stuck' });
+  await waitFor(() => t.events.some(e => e.type === 'message.part' && e.conversationId === one.chatId && e.part.type === 'subagent'), 'open subagent');
+  await t.api('POST', `/api/conversations/${one.chatId}/stop`);
+  const reply = await finishedReply(t, one.chatId, one.id, 4);
+  assert.equal(reply.status, 'stopped');
+  const closed = (m: Message) => m.parts.flatMap(p => (p.type === 'tool' ? [p.status] : p.type === 'subagent' ? [`${p.state} ${p.activity}`] : []));
+  assert.deepEqual(closed(reply), ['failed', 'idle Stopped']);
+
+  // The next turn waits for the agent to end the cancelled one, which reports both finished first.
+  await t.api('POST', `/api/conversations/${one.chatId}/messages`, { text: 'after' });
+  await finishedReply(t, one.chatId, one.id, 5);
+  const page = await t.api<{ messages: Message[] }>('GET', `/api/conversations/${one.chatId}/messages`);
+  assert.deepEqual(closed(page.messages.find(m => m.id === reply.id)!), ['failed', 'idle Stopped']);
+});

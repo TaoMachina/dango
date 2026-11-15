@@ -11,8 +11,9 @@ const fakeAgent = fileURLToPath(new URL('./fixtures/fake-agent.ts', import.meta.
 
 // Fake ACP agents: each runs test/fixtures/fake-agent.ts and mentions `target` when told to chain.
 // sessionDelayMs holds session/new open, so a test can act while the session is starting.
-export function fakeEntry(id: string, name: string, target = '', sessionDelayMs = 0): CatalogEntry {
-  return { id, runtimeLabel: name, detect: [process.execPath], launch: () => ({ command: process.execPath, args: [fakeAgent, name, target, String(sessionDelayMs)] }) };
+// restore 'load-fails' makes the agent offer session/load instead of session/resume, and fail every load.
+export function fakeEntry(id: string, name: string, target = '', sessionDelayMs = 0, restore: 'resume' | 'load-fails' = 'resume'): CatalogEntry {
+  return { id, runtimeLabel: name, detect: [process.execPath], launch: () => ({ command: process.execPath, args: [fakeAgent, name, target, String(sessionDelayMs), restore] }) };
 }
 
 // Fake agents answer in milliseconds; 10 s only bounds a broken test.

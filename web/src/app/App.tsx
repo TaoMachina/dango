@@ -11,7 +11,10 @@ function start() {
   if (started) return;
   started = true;
   window.addEventListener('popstate', restoreFromUrl);
-  void loadState().then(connectEvents);
+  // The event stream retries until the hub answers, and its 'hello' loads the state again,
+  // so a hub that is briefly unreachable at first does not leave the page blank.
+  void loadState();
+  connectEvents();
 }
 
 export function App() {

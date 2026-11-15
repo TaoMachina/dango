@@ -5,7 +5,8 @@ import { fullTime } from '../lib/time.ts';
 import { MessageMeta } from './MessageActions.tsx';
 import { ErrorPart, ImagePart, PermissionPart, PlanPart, SubagentPart, ThoughtPart, ToolPart } from './parts.tsx';
 
-function PartView({ part, mine }: { part: Part; mine: boolean }) {
+// streaming: whether the message is still being written; only then can a step be in progress.
+function PartView({ part, mine, streaming }: { part: Part; mine: boolean; streaming: boolean }) {
   switch (part.type) {
     case 'text':
       return (
@@ -16,7 +17,7 @@ function PartView({ part, mine }: { part: Part; mine: boolean }) {
     case 'thought':
       return <ThoughtPart part={part} />;
     case 'tool':
-      return <ToolPart part={part} />;
+      return <ToolPart part={part} streaming={streaming} />;
     case 'plan':
       return <PlanPart part={part} />;
     case 'permission':
@@ -67,7 +68,7 @@ export function MessageItem({ message, agent, showHeader, triggeredBy, run }: Pr
         </div>
       )}
       {message.parts.map((part, index) => (
-        <PartView key={index} part={part} mine={mine} />
+        <PartView key={index} part={part} mine={mine} streaming={message.status === 'streaming'} />
       ))}
       {message.status === 'streaming' && message.parts.length === 0 && <Typing />}
       {message.status === 'stopped' && <p className="text-[12px] text-muted">Stopped</p>}

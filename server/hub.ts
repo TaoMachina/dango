@@ -46,14 +46,6 @@ export async function createHub(options: HubOptions) {
   const store = new Store(db, catalog);
   const webDist = options.webDist === undefined ? join(serverDir, '..', 'web', 'dist') : options.webDist;
 
-  // No agent process survives a restart: installed agents start idle, external ones until they poll again.
-  // A url agent runs elsewhere, so it keeps the status of its last call.
-  store.failInterruptedWork();
-  for (const agent of store.listAgents()) {
-    if (agent.source === 'acp') store.updateAgent(agent.id, { status: 'available', statusDetail: null });
-    if (agent.source === 'external') store.updateAgent(agent.id, { status: 'offline', statusDetail: null });
-  }
-
   let port = options.port;
   const hubUrl = () => `http://127.0.0.1:${port}`;
   const events = new Events();
@@ -69,7 +61,6 @@ export async function createHub(options: HubOptions) {
   });
   const urlAgents = new UrlAgents(store, events, runs);
   runs.executors = { acp, external, url: urlAgents };
-  rescan(store, events, catalog);
 
   const auth = new Auth(store, key);
   let closing: Promise<void> | null = null;
@@ -156,11 +147,25 @@ export async function createHub(options: HubOptions) {
       else res.end();
     });
   });
+  // A second hub on the same port fails here, before it changes the running hub's data.
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(options.port, '127.0.0.1', () => resolve());
+  }).catch(error => {
+    db.close();
+    throw error;
   });
   port = (server.address() as { port: number }).port;
+
+  // This hub owns the data now. No agent process survives a restart: installed agents start idle, external ones until
+  // they poll again. A url agent runs elsewhere, so it keeps the status of its last call. Requests wait for this
+  // synchronous cleanup, which runs before the event loop handles the first connection.
+  store.failInterruptedWork();
+  for (const agent of store.listAgents()) {
+    if (agent.source === 'acp') store.updateAgent(agent.id, { status: 'available', statusDetail: null });
+    if (agent.source === 'external') store.updateAgent(agent.id, { status: 'offline', statusDetail: null });
+  }
+  rescan(store, events, catalog);
   routines.arm();
 
   return { url: hubUrl(), port, key, paths, store, runs, tools, close };

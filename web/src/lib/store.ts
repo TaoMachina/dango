@@ -118,7 +118,30 @@ export function updateUI(patch: Partial<UI>) {
   setState((s) => ({ ui: { ...s.ui, ...patch } }));
 }
 
+// Threads whose messages are being fetched. Events for them collect here and merge into the fetched page,
+// so a message or run that starts while the page loads is not lost. Fetches of one thread can overlap
+// (React's StrictMode runs the opening effect twice), so they share one buffer.
+const fetching = new Map<ID, { thread: Thread; fetches: number }>();
+
+export function startFetch(id: ID) {
+  const pending = fetching.get(id);
+  if (pending) pending.fetches++;
+  else fetching.set(id, { thread: { messages: [], runs: {}, hasMore: false }, fetches: 1 });
+}
+
+/** What arrived over the event stream since the first overlapping startFetch. */
+export function endFetch(id: ID): Thread {
+  const pending = fetching.get(id)!;
+  if (--pending.fetches === 0) fetching.delete(id);
+  return pending.thread;
+}
+
 export function updateThread(id: ID, recipe: (t: Thread) => Thread) {
+  const pending = fetching.get(id);
+  if (pending) {
+    pending.thread = recipe(pending.thread);
+    return;
+  }
   setState((s) => {
     const thread = s.threads[id];
     return thread ? { threads: { ...s.threads, [id]: recipe(thread) } } : {};

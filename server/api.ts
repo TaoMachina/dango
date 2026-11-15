@@ -69,6 +69,7 @@ export function apiRoutes(d: ApiDeps): Router {
     for (const child of store.childConversations(id)) removeConversation(child);
     const routineIds = store.listRoutines().filter(r => r.conversationId === id).map(r => r.id);
     store.deleteConversation(id);
+    d.acp.forget(id);
     for (const routineId of routineIds) events.emit({ type: 'routine.removed', routineId });
     events.emit({ type: 'conversation.removed', conversationId: id });
     d.routines.arm();
@@ -165,6 +166,11 @@ export function apiRoutes(d: ApiDeps): Router {
         leadId = memberIds[0];
       }
       if (body.memberIds) store.setMembers(conv.id, memberIds);
+      // A member who leaves takes its work in this group with it: its queued and active runs stop and its routines here go.
+      for (const agentId of conv.memberIds.filter(id => !memberIds.includes(id))) {
+        runs.stopAgent(conv.id, agentId);
+        for (const r of store.listRoutines().filter(r => r.conversationId === conv.id && r.agentId === agentId)) d.routines.delete(r.id);
+      }
       const updated = store.updateConversation(conv.id, { title: body.title, avatar: body.avatar, leadId, hopLimit: body.hopLimit });
       emitConversation(updated);
       return updated;

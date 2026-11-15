@@ -63,7 +63,7 @@ function ToolContentView({ content }: { content: ToolContent }) {
   }
 }
 
-export function ToolPart({ part }: { part: PartOf<'tool'> }) {
+export function ToolPart({ part, streaming }: { part: PartOf<'tool'>; streaming: boolean }) {
   const [open, setOpen] = useState(false);
   const Icon = TOOL_ICON[part.kind] ?? Wrench;
   const expandable = part.content.length > 0 || part.locations.length > 0;
@@ -78,12 +78,13 @@ export function ToolPart({ part }: { part: PartOf<'tool'> }) {
       >
         <Icon size={14} className="shrink-0" />
         <span className="min-w-0 flex-1 truncate text-fg/80">{part.title}</span>
-        {part.status === 'in_progress' || part.status === 'pending' ? (
-          <Spinner size={13} />
+        {/* A step left open in a finished reply shows no state: it neither ran on nor reported an end. */}
+        {part.status === 'completed' ? (
+          <Check size={14} className="shrink-0 text-success" aria-label="Done" />
         ) : part.status === 'failed' ? (
           <X size={14} className="shrink-0 text-danger" aria-label="Failed" />
         ) : (
-          <Check size={14} className="shrink-0 text-success" aria-label="Done" />
+          streaming && <Spinner size={13} />
         )}
       </button>
       {open && (
