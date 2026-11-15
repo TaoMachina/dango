@@ -43,12 +43,12 @@ const agents: Agent[] = [
     description: 'Writes and reviews code in my projects.',
   }),
   agent('codex', 'Codex', { avatar: { kind: 'blob', color: '#2B2B2E', shape: 0, face: 2 }, catalogId: 'codex' }),
-  agent('gemini', 'Gemini', {
+  agent('antigravity', 'Antigravity', {
     avatar: { kind: 'blob', color: '#4C8DF6', shape: 2, face: 0 },
-    catalogId: 'gemini',
-    runtimeLabel: 'Gemini CLI',
+    catalogId: 'antigravity',
+    runtimeLabel: 'Antigravity',
     status: 'needs-auth',
-    statusDetail: 'Run `gemini` in a terminal once to sign in.',
+    statusDetail: 'Run `agy acp --login` in a terminal once to sign in.',
   }),
   agent('goose', 'Goose', { avatar: { kind: 'blob', color: '#3CC48F', shape: 4, face: 4 }, hidden: true, status: 'available' }),
 ];
@@ -74,11 +74,11 @@ function conversation(id: ID, extra: Partial<Conversation>): Conversation {
 const conversations: Conversation[] = [
   ...agents.map((a) => conversation(a.chatId, { title: a.name, memberIds: [a.id] })),
   conversation('g-launch', { kind: 'group', title: 'Launch crew', memberIds: ['claude', 'codex'], leadId: 'claude' }),
-  conversation('t-composer', { kind: 'code', title: 'Grow the composer with its text', memberIds: ['claude'], projectId: 'p-rea' }),
+  conversation('t-composer', { kind: 'code', title: 'Grow the composer with its text', memberIds: ['claude'], projectId: 'p-agentry' }),
 ];
 
 const projects: Project[] = [
-  { id: 'p-rea', name: 'rea', path: 'D:\\projects\\rea', environmentId: 'local', createdAt: ago(60 * 24 * 3) },
+  { id: 'p-agentry', name: 'agentry', path: 'D:\\projects\\agentry', environmentId: 'local', createdAt: ago(60 * 24 * 3) },
   { id: 'p-site', name: 'site', path: 'D:\\projects\\site', environmentId: 'local', createdAt: ago(60 * 24 * 2) },
 ];
 
@@ -429,7 +429,7 @@ export async function fixtureFetch(url: string, init: RequestInit): Promise<Resp
   }
   if ((m = path.match(/^\/api\/conversations\/([^/]+)\/session$/))) {
     const agentId = body.agentId as ID;
-    if (agents.find((a) => a.id === agentId)?.status === 'needs-auth') return json({ error: 'Gemini needs a sign-in before it can start.' }, 409);
+    if (agents.find((a) => a.id === agentId)?.status === 'needs-auth') return json({ error: 'Antigravity needs a sign-in before it can start.' }, 409);
     return json(session(m[1], agentId));
   }
   if ((m = path.match(/^\/api\/conversations\/([^/]+)\/session\/option$/))) {
@@ -472,7 +472,7 @@ export async function fixtureFetch(url: string, init: RequestInit): Promise<Resp
     emit({ type: 'conversation.upsert', conversation: structuredClone(conversations.at(-1)!) });
     return json({
       agent: a,
-      instruction: `You are joining Rea as "${a.name}".\n\n1. Read your inbox: GET http://127.0.0.1:7420/api/external/inbox\n2. Post replies: POST http://127.0.0.1:7420/api/external/messages\n\nUse this header on every request:\nAuthorization: Bearer rea_sample_token\n\nSay hello in your chat when you are connected.`,
+      instruction: `You are joining Agentry as "${a.name}".\n\n1. Read your inbox: GET http://127.0.0.1:7420/api/external/inbox\n2. Post replies: POST http://127.0.0.1:7420/api/external/messages\n\nUse this header on every request:\nAuthorization: Bearer agentry_sample_token\n\nSay hello in your chat when you are connected.`,
     });
   }
   if ((m = path.match(/^\/api\/agents\/([^/]+)$/))) {

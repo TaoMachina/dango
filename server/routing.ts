@@ -38,7 +38,7 @@ export function formatPrompt(conversation: Conversation, agent: Agent, members: 
   const body = lines.map(l => `[${l.author}]: ${l.text}`).join('\n\n');
   if (!intro) return body;
   const others = members.filter(m => m.id !== agent.id).map(m => `@${m.name} (${m.runtimeLabel})`).join(', ');
-  return `You are ${agent.name} in the Rea group "${conversation.title}" with ${others || 'no other agents'}. ` +
+  return `You are ${agent.name} in the Agentry group "${conversation.title}" with ${others || 'no other agents'}. ` +
     `Group messages reach you as [Author]: text. Write @Name to hand work to a member. Your reply is posted to the group.\n\n${body}`;
 }
 

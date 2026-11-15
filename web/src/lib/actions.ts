@@ -58,14 +58,14 @@ export function restoreFromUrl() {
 export function toggleList(wide: boolean) {
   const ui = getState().ui;
   if (!wide) return updateUI({ drawer: ui.drawer === 'list' ? null : 'list' });
-  localStorage.setItem('rea.listCollapsed', ui.listCollapsed ? '0' : '1');
+  localStorage.setItem('agentry.listCollapsed', ui.listCollapsed ? '0' : '1');
   updateUI({ listCollapsed: !ui.listCollapsed });
 }
 
 export function togglePanel(wide: boolean) {
   const ui = getState().ui;
   if (!wide) return updateUI({ drawer: ui.drawer === 'panel' ? null : 'panel' });
-  localStorage.setItem('rea.panelOpen', ui.panelOpen ? '0' : '1');
+  localStorage.setItem('agentry.panelOpen', ui.panelOpen ? '0' : '1');
   updateUI({ panelOpen: !ui.panelOpen });
 }
 

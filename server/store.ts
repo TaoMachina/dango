@@ -89,7 +89,7 @@ export class Store {
 
   authorName(author: MessageAuthor): string {
     if (author.type === 'user') return 'You';
-    if (author.type === 'system') return 'Rea';
+    if (author.type === 'system') return 'Agentry';
     return this.getAgent(author.agentId)?.name ?? 'Agent';
   }
 
@@ -222,10 +222,10 @@ export class Store {
   // Runs and streaming messages cannot survive a hub restart: their agent processes are gone.
   failInterruptedWork() {
     const at = now();
-    this.db.prepare(`UPDATE runs SET status = 'error', error = 'Rea restarted before this run finished.', ended_at = ? WHERE status IN ('queued', 'running')`).run(at);
+    this.db.prepare(`UPDATE runs SET status = 'error', error = 'Agentry restarted before this run finished.', ended_at = ? WHERE status IN ('queued', 'running')`).run(at);
     for (const r of this.db.prepare(`SELECT * FROM messages WHERE status = 'streaming'`).all() as Row[]) {
       const m = this.messageFrom(r);
-      m.parts.push({ type: 'error', text: 'Rea restarted before this reply finished.' });
+      m.parts.push({ type: 'error', text: 'Agentry restarted before this reply finished.' });
       m.status = 'error';
       this.saveMessage(m);
     }

@@ -28,7 +28,7 @@ test('the key buys a one-time code that signs the browser in once', async () => 
   assert.equal(first.status, 302);
   assert.equal(first.headers.location, '/');
   const cookie = String(first.headers['set-cookie']);
-  assert.match(cookie, /^rea_session=[0-9a-f]+; HttpOnly; SameSite=Strict; Path=\/; Max-Age=31536000$/);
+  assert.match(cookie, /^agentry_session=[0-9a-f]+; HttpOnly; SameSite=Strict; Path=\/; Max-Age=31536000$/);
   assert.equal((await t.raw('GET', '/api/state', { cookie: cookie.split(';')[0] })).status, 200);
   assert.equal((await t.raw('GET', `/auth?code=${code}`)).status, 401);
 });

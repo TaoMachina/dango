@@ -19,7 +19,7 @@ export interface CatalogEntry {
 
 const require = createRequire(import.meta.url);
 
-// The Claude Code and Codex adapters are pinned dependencies of Rea; run their entry scripts with this Node.
+// The Claude Code and Codex adapters are pinned dependencies of Agentry; run their entry scripts with this Node.
 function adapter(pkg: string): Launch {
   return { command: process.execPath, args: [join(dirname(require.resolve(`${pkg}/package.json`)), 'dist', 'index.js')] };
 }
@@ -46,7 +46,8 @@ const bin = (command: string, ...args: string[]) => () => ({ command, args });
 export const builtInCatalog: CatalogEntry[] = [
   { id: 'claude-code', runtimeLabel: 'Claude Code', detect: ['claude'], launch: () => ({ ...adapter('@agentclientprotocol/claude-agent-acp'), env: gitBashEnv() }) },
   { id: 'codex', runtimeLabel: 'Codex', detect: ['codex'], launch: () => adapter('@agentclientprotocol/codex-acp') },
-  { id: 'gemini', runtimeLabel: 'Gemini CLI', detect: ['gemini'], launch: bin('gemini', '--acp') },
+  // Antigravity CLI replaced Gemini CLI on 2026-06-18; 'agy acp' is its ACP server (release 1.5.0).
+  { id: 'antigravity', runtimeLabel: 'Antigravity', detect: ['agy'], launch: bin('agy', 'acp') },
   { id: 'opencode', runtimeLabel: 'OpenCode', detect: ['opencode'], launch: bin('opencode', 'acp') },
   { id: 'goose', runtimeLabel: 'Goose', detect: ['goose'], launch: bin('goose', 'acp') },
   { id: 'openclaw', runtimeLabel: 'OpenClaw', detect: ['openclaw'], launch: bin('openclaw', 'acp') },
@@ -90,7 +91,7 @@ export function isInstalled(entry: CatalogEntry): boolean {
 
 // Turns a launch into something spawn can start without a shell where possible.
 // Windows cannot spawn .cmd files directly, and a shell in between hides the real process from kill.
-// npm's .cmd shims name the script or executable they run, so Rea runs that target itself.
+// npm's .cmd shims name the script or executable they run, so Agentry runs that target itself.
 export function resolveLaunch(launch: Launch): Launch & { shell: boolean } {
   const resolved = findOnPath(launch.command) ?? launch.command;
   if (process.platform !== 'win32' || /\.(exe|com)$/i.test(resolved)) return { ...launch, command: resolved, shell: false };

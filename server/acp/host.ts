@@ -65,7 +65,7 @@ export class AcpHost implements Executor {
     const running = this.processes.get(agent.id);
     if (running) return running;
     const entry = this.o.catalog.find(e => e.id === agent.catalogId);
-    if (!entry) throw new Error(`${agent.runtimeLabel} is not in Rea's agent catalog.`);
+    if (!entry) throw new Error(`${agent.runtimeLabel} is not in Agentry's agent catalog.`);
     this.setStatus(agent.id, 'starting', null);
     const proc = new AgentProcess(entry, {
       onUpdate: n => this.onUpdate(n),
@@ -110,10 +110,10 @@ export class AcpHost implements Executor {
   private mcpServers(agentId: ID, conversationId: ID): acp.McpServer[] {
     const token = this.o.tools.issue(agentId, conversationId);
     return [{
-      name: 'rea',
+      name: 'agentry',
       command: process.execPath,
       args: [this.o.bridgePath],
-      env: [{ name: 'REA_URL', value: this.o.hubUrl() }, { name: 'REA_TOOL_TOKEN', value: token }],
+      env: [{ name: 'AGENTRY_URL', value: this.o.hubUrl() }, { name: 'AGENTRY_TOOL_TOKEN', value: token }],
     }];
   }
 

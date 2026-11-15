@@ -14,7 +14,7 @@ const FACES = 5;
 const KNOWN: Record<string, Avatar> = {
   'claude-code': { kind: 'blob', color: '#FF8A3D', shape: 3, face: 1 },
   codex: { kind: 'blob', color: '#2B2B2E', shape: 0, face: 0 },
-  gemini: { kind: 'blob', color: '#4C8DF6', shape: 2, face: 2 },
+  antigravity: { kind: 'blob', color: '#4C8DF6', shape: 2, face: 2 },
 };
 
 // Picks a known avatar, else a color no other agent uses yet, so the list stays easy to scan.

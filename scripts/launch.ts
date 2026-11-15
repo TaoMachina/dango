@@ -1,4 +1,4 @@
-// Opens Rea: starts the hub in the background if it is not running,
+// Opens Agentry: starts the hub in the background if it is not running,
 // then opens the default browser already signed in.
 // The desktop icon runs this file.
 import { spawn } from 'node:child_process';
@@ -27,7 +27,7 @@ function openBrowser(url: string) {
 
 async function startHub() {
   if (!existsSync(join(root, 'web', 'dist', 'index.html'))) {
-    throw new Error('The web app is not built. Run `npm run setup` in the Rea folder.');
+    throw new Error('The web app is not built. Run `npm run setup` in the Agentry folder.');
   }
   mkdirSync(paths.dir, { recursive: true });
   const log = openSync(paths.log, 'a');
@@ -41,7 +41,7 @@ async function startHub() {
   child.on('exit', code => { exited = code ?? 1; });
   // Poll at a short interval until the hub answers or its process ends.
   while (!(await running())) {
-    if (exited !== null) throw new Error(`Rea stopped while starting (exit ${exited}). See ${paths.log}`);
+    if (exited !== null) throw new Error(`Agentry stopped while starting (exit ${exited}). See ${paths.log}`);
     await new Promise(r => setTimeout(r, 200));
   }
   child.unref();
@@ -52,6 +52,6 @@ if (!(await running())) await startHub();
 // Exchange the local key for a one-time sign-in code so the key never enters browser history.
 const key = readFileSync(paths.key, 'utf8').trim();
 const response = await fetch(`${origin}/auth/code`, { method: 'POST', headers: { authorization: `Bearer ${key}` } });
-if (!response.ok) throw new Error(`Rea refused the local key (${response.status}). See ${paths.log}`);
+if (!response.ok) throw new Error(`Agentry refused the local key (${response.status}). See ${paths.log}`);
 const { code } = await response.json() as { code: string };
 openBrowser(`${origin}/auth?code=${code}`);

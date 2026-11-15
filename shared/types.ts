@@ -35,7 +35,7 @@ export interface Agent {
   avatar: Avatar;
   description: string;
   source: 'acp' | 'external';
-  catalogId: string | null; // built-in catalog entry, e.g. 'claude-code', 'codex', 'gemini'
+  catalogId: string | null; // built-in catalog entry, e.g. 'claude-code', 'codex', 'antigravity'
   runtimeLabel: string; // product name, e.g. 'Claude Code'
   environmentId: ID;
   status: AgentStatus;

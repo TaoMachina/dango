@@ -38,7 +38,7 @@ function SettingsMenu() {
           void shutdown();
         }}
       >
-        Quit Rea
+        Quit Agentry
       </MenuItem>
     </div>
   );
@@ -49,7 +49,7 @@ export function Rail() {
   const settings = usePopover();
   return (
     <nav aria-label="Modules" className="flex h-full w-[60px] shrink-0 flex-col items-center gap-1 py-3">
-      <div className="mb-3" title="Rea">
+      <div className="mb-3" title="Agentry">
         <svg width={28} height={28} viewBox="0 0 100 100" aria-hidden="true">
           <path d={BLOB_SHAPES[0].path} fill="var(--fg)" />
           <ellipse cx={39} cy={50} rx={4.5} ry={7} fill="var(--bg)" />

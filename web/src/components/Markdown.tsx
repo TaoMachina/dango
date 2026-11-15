@@ -140,7 +140,7 @@ function safeHref(url: string) {
   return /^(https?:|mailto:|\?m=(chat|code)&c=)/i.test(url) ? url : null;
 }
 
-// The hub links Rea conversations as `?m=<module>&c=<id>`; open those in place.
+// The hub links Agentry conversations as `?m=<module>&c=<id>`; open those in place.
 function link(href: string, children: ReactNode, key: number) {
   if (href.startsWith('?')) {
     const params = new URLSearchParams(href);

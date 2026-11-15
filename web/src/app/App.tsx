@@ -21,7 +21,7 @@ export function App() {
   if (auth === 'unauthorized' || auth === 'closed') {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-muted">
-        {auth === 'closed' ? 'Rea is closed. Open it from its desktop icon.' : 'Open Rea from its desktop icon.'}
+        {auth === 'closed' ? 'Agentry is closed. Open it from its desktop icon.' : 'Open Agentry from its desktop icon.'}
       </div>
     );
   }

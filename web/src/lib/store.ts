@@ -64,8 +64,8 @@ let state: State = {
     module: startModule,
     selected: { chat: null, code: null, [startModule]: params.get('c') },
     newThreadProjectId: null,
-    listCollapsed: localStorage.getItem('rea.listCollapsed') === '1',
-    panelOpen: localStorage.getItem('rea.panelOpen') !== '0',
+    listCollapsed: localStorage.getItem('agentry.listCollapsed') === '1',
+    panelOpen: localStorage.getItem('agentry.panelOpen') !== '0',
     drawer: null,
   },
 };

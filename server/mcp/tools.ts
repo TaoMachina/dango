@@ -1,4 +1,4 @@
-// The hub side of the Rea tools that agents call through server/mcp/bridge.ts.
+// The hub side of the Agentry tools that agents call through server/mcp/bridge.ts.
 import { randomBytes } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';

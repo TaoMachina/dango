@@ -1,5 +1,5 @@
-// Draws the Rea mark (a soft dark blob with two eyes) and writes
-// assets/icon-256.png, assets/rea.ico and assets/rea.icns.
+// Draws the Agentry mark (a soft dark blob with two eyes) and writes
+// assets/icon-256.png, assets/agentry.ico and assets/agentry.icns.
 // Run once after changing the drawing: node scripts/make-icon.ts
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -91,6 +91,6 @@ const icns = Buffer.concat([icnsHeader, element, png]);
 
 mkdirSync(join(root, 'assets'), { recursive: true });
 writeFileSync(join(root, 'assets', 'icon-256.png'), png);
-writeFileSync(join(root, 'assets', 'rea.ico'), ico);
-writeFileSync(join(root, 'assets', 'rea.icns'), icns);
-console.log('Wrote assets/icon-256.png, assets/rea.ico, assets/rea.icns');
+writeFileSync(join(root, 'assets', 'agentry.ico'), ico);
+writeFileSync(join(root, 'assets', 'agentry.icns'), icns);
+console.log('Wrote assets/icon-256.png, assets/agentry.ico, assets/agentry.icns');

@@ -1,4 +1,4 @@
-// Maps ACP session updates onto Rea message parts and session settings.
+// Maps ACP session updates onto Agentry message parts and session settings.
 import type * as acp from '@agentclientprotocol/sdk';
 import type { ID, Part, SessionInfo, SessionOption, ToolContent } from '../../shared/types.ts';
 import type { LiveRun } from '../routing.ts';

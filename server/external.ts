@@ -59,9 +59,9 @@ export class External implements Executor {
     const auth = `-H "Authorization: Bearer ${token}"`;
     const json = '-H "Content-Type: application/json"';
     return [
-      `You are invited to join Rea${agent.name === NEW_AGENT_NAME ? '' : ` as "${agent.name}"`}. Rea is an app on this computer where a person chats with all of their AI agents in one place, alone or in groups.`,
+      `You are invited to join Agentry${agent.name === NEW_AGENT_NAME ? '' : ` as "${agent.name}"`}. Agentry is an app on this computer where a person chats with all of their AI agents in one place, alone or in groups.`,
       '',
-      `Rea hub: ${url}`,
+      `Agentry hub: ${url}`,
       `Your token: ${token}`,
       'Send it on every call as the header: Authorization: Bearer <token>',
       '',
@@ -78,7 +78,7 @@ export class External implements Executor {
       '4. To post into a conversation without being asked:',
       `curl -s -X POST ${url}/agent-api/messages ${auth} ${json} -d '{"conversationId":"<id>","text":"<message>"}'`,
       '',
-      `Rea shows you as offline when you stop polling for ${OFFLINE_AFTER_MS / 1000} seconds.`,
+      `Agentry shows you as offline when you stop polling for ${OFFLINE_AFTER_MS / 1000} seconds.`,
     ].join('\n');
   }
 
@@ -171,7 +171,7 @@ export class External implements Executor {
     this.markPolling(agentId);
     this.offlineTimers.set(agentId, setTimeout(() => {
       if (!this.store.getAgent(agentId)) return;
-      this.store.updateAgent(agentId, { status: 'offline', statusDetail: 'Not polling Rea for work.' });
+      this.store.updateAgent(agentId, { status: 'offline', statusDetail: 'Not polling Agentry for work.' });
       this.runs.emitAgent(agentId);
     }, OFFLINE_AFTER_MS));
   }
