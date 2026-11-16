@@ -7,6 +7,7 @@ import { CodeHome } from '../code/CodeHome.tsx';
 import { NewThread } from '../code/NewThread.tsx';
 import { ConversationView } from '../conversation/ConversationView.tsx';
 import { RightPanel } from '../panels/RightPanel.tsx';
+import { SideThread } from '../panels/SideThread.tsx';
 import { toggleList } from '../lib/actions.ts';
 import { updateUI, useStore } from '../lib/store.ts';
 import { useMedia, WIDE_LIST, WIDE_PANEL } from '../lib/media.ts';
@@ -39,10 +40,13 @@ export function Shell() {
   const widePanel = useMedia(WIDE_PANEL);
   const id = ui.selected[ui.module];
   const conversation = id && !(ui.module === 'code' && ui.newThreadProjectId) ? conversations[id] : undefined;
-  const closeDrawer = () => updateUI({ drawer: null });
+  const side = conversation && ui.side ? conversations[ui.side.id] : undefined;
+  const closeDrawer = () => updateUI({ drawer: null, side: null });
   // Code threads show diffs in the panel, so it is wider. At the 1280px panel breakpoint
   // 1280 - 60 rail - 300 list - 400 panel still leaves 520px for the thread.
-  const panelWidth = conversation?.kind === 'code' ? 'w-[400px]' : 'w-[320px]';
+  // A helper's thread is a whole conversation, so it takes 480px and leaves 440px.
+  const panelWidth = side ? 'w-[480px]' : conversation?.kind === 'code' ? 'w-[400px]' : 'w-[320px]';
+  const panel = side ? <SideThread key={side.id} conversation={side} /> : conversation && <RightPanel conversation={conversation} />;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -73,17 +77,15 @@ export function Shell() {
       </main>
       {conversation &&
         (widePanel ? (
-          ui.panelOpen && (
+          (ui.panelOpen || side) && (
             <aside className={`h-full ${panelWidth} shrink-0 overflow-y-auto border-l border-line`}>
-              <RightPanel conversation={conversation} />
+              {panel}
             </aside>
           )
         ) : (
           ui.drawer === 'panel' && (
             <Drawer side="right" label="Details" onClose={closeDrawer}>
-              <div className={`h-full ${panelWidth} max-w-[88vw] overflow-y-auto`}>
-                <RightPanel conversation={conversation} />
-              </div>
+              <div className={`h-full ${panelWidth} max-w-[88vw] overflow-y-auto`}>{panel}</div>
             </Drawer>
           )
         ))}

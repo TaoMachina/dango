@@ -34,6 +34,12 @@ export interface UI {
   panelOpen: boolean; // wide screens
   drawer: Drawer; // narrow screens
   highlight: ID | null; // a message the timeline flashes after a jump to it
+  side: SideThread | null; // a helper's thread shown in the right panel
+}
+
+export interface SideThread {
+  id: ID;
+  fromPanel: boolean; // the panel was showing when it opened, so Back returns there instead of closing
 }
 
 export interface State {
@@ -72,6 +78,7 @@ let state: State = {
     panelOpen: localStorage.getItem('agentry.panelOpen') !== '0',
     drawer: null,
     highlight: null,
+    side: null,
   },
 };
 

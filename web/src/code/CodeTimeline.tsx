@@ -28,7 +28,8 @@ import { Markdown } from '../components/Markdown.tsx';
 import { Spinner } from '../components/ui.tsx';
 import { MessageMeta } from '../conversation/MessageActions.tsx';
 import { ErrorPart, ImagePart } from '../conversation/parts.tsx';
-import { answerPermission, select } from '../lib/actions.ts';
+import { answerPermission, openSideThread } from '../lib/actions.ts';
+import { useMedia, WIDE_PANEL } from '../lib/media.ts';
 import { updateUI, useStore } from '../lib/store.ts';
 import { fullTime } from '../lib/time.ts';
 import {
@@ -207,10 +208,11 @@ export function LiveSubagentFace({ part, agent, size }: { part: LiveSubagent; ag
   );
 }
 
-/** "Open" for a subagent that has its own thread in Agentry. */
+/** "Open" for a subagent that has its own thread in Agentry: it opens in the right panel. */
 export function OpenThreadButton({ conversationId }: { conversationId: ID }) {
+  const wide = useMedia(WIDE_PANEL);
   return (
-    <button type="button" onClick={() => select('code', conversationId)} className="h-6 shrink-0 rounded-md px-1.5 text-[12px] text-muted hover:bg-hover hover:text-fg">
+    <button type="button" onClick={() => openSideThread(conversationId, wide)} className="h-6 shrink-0 rounded-md px-1.5 text-[12px] text-muted hover:bg-hover hover:text-fg">
       Open
     </button>
   );

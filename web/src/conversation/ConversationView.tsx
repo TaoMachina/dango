@@ -15,7 +15,7 @@ import { MessageList } from './MessageList.tsx';
 function Header({ conversation }: { conversation: Conversation }) {
   const agents = useStore((s) => s.agents);
   const project = useStore((s) => (conversation.projectId ? s.projects[conversation.projectId] : undefined));
-  const panelOpen = useStore((s) => s.ui.panelOpen);
+  const panelOpen = useStore((s) => s.ui.panelOpen || s.ui.side !== null);
   const widePanel = useMedia(WIDE_PANEL);
   const agent = primaryAgent(conversation, agents);
   const title = conversationTitle(conversation, agents);
@@ -44,12 +44,16 @@ function Header({ conversation }: { conversation: Conversation }) {
   );
 }
 
-export function ConversationView({ conversation }: { conversation: Conversation }) {
+/** Opens the agent's session so the composer shows its models and options. */
+export function useAgentSession(conversation: Conversation) {
   const agentId = conversation.kind === 'group' ? null : conversation.memberIds[0];
-
   useEffect(() => {
     if (agentId) void openSession(conversation.id, agentId);
   }, [conversation.id, agentId]);
+}
+
+export function ConversationView({ conversation }: { conversation: Conversation }) {
+  useAgentSession(conversation);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

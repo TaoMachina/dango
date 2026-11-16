@@ -36,18 +36,18 @@ function writeUrl(push: boolean) {
 
 export function select(module: Module, id: ID | null) {
   const ui = getState().ui;
-  updateUI({ module, selected: { ...ui.selected, [module]: id }, newThreadProjectId: null, drawer: null });
+  updateUI({ module, selected: { ...ui.selected, [module]: id }, newThreadProjectId: null, drawer: null, side: null });
   writeUrl(true);
 }
 
 export function selectModule(module: Module) {
-  updateUI({ module, newThreadProjectId: null });
+  updateUI({ module, newThreadProjectId: null, side: null });
   writeUrl(true);
 }
 
 export function openNewThread(projectId: ID) {
   const ui = getState().ui;
-  updateUI({ module: 'code', selected: { ...ui.selected, code: null }, newThreadProjectId: projectId, drawer: null });
+  updateUI({ module: 'code', selected: { ...ui.selected, code: null }, newThreadProjectId: projectId, drawer: null, side: null });
   writeUrl(true);
 }
 
@@ -55,7 +55,7 @@ export function restoreFromUrl() {
   const params = new URLSearchParams(location.search);
   const module: Module = params.get('m') === 'code' ? 'code' : 'chat';
   const ui = getState().ui;
-  updateUI({ module, selected: { ...ui.selected, [module]: params.get('c') }, newThreadProjectId: null });
+  updateUI({ module, selected: { ...ui.selected, [module]: params.get('c') }, newThreadProjectId: null, side: null });
 }
 
 export function toggleList(wide: boolean) {
@@ -67,9 +67,24 @@ export function toggleList(wide: boolean) {
 
 export function togglePanel(wide: boolean) {
   const ui = getState().ui;
-  if (!wide) return updateUI({ drawer: ui.drawer === 'panel' ? null : 'panel' });
-  localStorage.setItem('agentry.panelOpen', ui.panelOpen ? '0' : '1');
-  updateUI({ panelOpen: !ui.panelOpen });
+  if (!wide) return updateUI({ drawer: ui.drawer === 'panel' ? null : 'panel', side: null });
+  // A helper's thread fills the panel, so the panel counts as open while it shows.
+  const open = !(ui.panelOpen || ui.side);
+  localStorage.setItem('agentry.panelOpen', open ? '1' : '0');
+  updateUI({ panelOpen: open, side: null });
+}
+
+/** Shows a helper's thread in the right panel, beside the thread that started it. */
+export function openSideThread(id: ID, wide: boolean) {
+  const ui = getState().ui;
+  updateUI({ side: { id, fromPanel: ui.side?.fromPanel ?? (wide ? ui.panelOpen : ui.drawer === 'panel') }, drawer: wide ? null : 'panel' });
+}
+
+/** Back from a helper's thread: to the panel if it was showing, else closed. */
+export function closeSideThread(wide: boolean) {
+  const ui = getState().ui;
+  if (!ui.side) return;
+  updateUI({ side: null, drawer: wide || !ui.side.fromPanel ? null : 'panel' });
 }
 
 // ---------- State ----------
