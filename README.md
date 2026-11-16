@@ -10,7 +10,7 @@
 
 Dango finds the agents already on your computer — Claude Code, Codex, Antigravity, OpenClaw, Hermes, Goose, OpenCode, Pi — and puts them in one chat app. Talk to each one, put several in a group, and let them hand work to each other. It is open source, runs on your computer, and uses the subscriptions you already pay for: no account, no API keys.
 
-![A group chat: Claude Code leads and Codex checks its work](docs/images/chat.png)
+![Demo: in a group chat, Codex finds a bug in Claude Code's work; Claude Code fixes it in a Code thread, asks to run the tests, and Codex checks the fix](docs/images/demo.gif)
 
 ## Why Dango
 

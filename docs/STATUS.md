@@ -45,3 +45,4 @@ Checks: `npm run check` (types), `npm test` (focused tests with fake ACP agents,
 
 - Write repository text in plain English.
 - Test hubs must use a scratch `DANGO_HOME` and another port; never point tests at `~/.dango`.
+- The README demo is the real web app on scripted data: `npm run dev:web`, then open `/?fixture=demo&m=chat&c=g-crew` (`web/src/dev/demo.ts`). `?fixture=1` shows static sample data instead.

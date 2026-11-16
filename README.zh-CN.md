@@ -10,7 +10,7 @@
 
 Dango 会找到你电脑上已经装好的 agent —— Claude Code、Codex、Antigravity、OpenClaw、Hermes、Goose、OpenCode、Pi —— 把它们放进同一个聊天应用。你可以单独和每个 agent 聊，也可以把几个拉进一个群，让它们互相分派工作。Dango 开源、在你自己的电脑上运行，用的是你已经付费的订阅：不用注册账号，不用 API key。
 
-![群聊：Claude Code 带队，Codex 复核](docs/images/chat.png)
+![演示：群聊里 Codex 发现 Claude Code 的 bug；Claude Code 在 Code 线程里修复、请求运行测试，再由 Codex 复查](docs/images/demo.gif)
 
 ## 为什么用 Dango
 

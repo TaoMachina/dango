@@ -1,6 +1,6 @@
 import type { HubEvent, Part } from '../../../shared/types.ts';
 import { loadState, select, storeAgentOptions, storeSession, streamReconnected, upsertMessage } from './actions.ts';
-import { fixtureMode } from './api.ts';
+import { fixtureMode, loadFixture } from './api.ts';
 import { getState, remove, setState, updateThread, upsert } from './store.ts';
 
 export function applyEvent(event: HubEvent) {
@@ -73,7 +73,7 @@ export function closeEvents() {
 
 export function connectEvents() {
   if (import.meta.env.DEV && fixtureMode) {
-    void import('../dev/fixture.ts').then((m) => m.fixtureEvents(applyEvent));
+    void loadFixture().then((m) => m.fixtureEvents(applyEvent));
     return;
   }
   source = new EventSource('/api/events');

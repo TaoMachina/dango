@@ -1,11 +1,15 @@
 import { setState, toast } from './store.ts';
 
-/** Dev only: `?fixture=1` serves sample data from web/src/dev/fixture.ts instead of the hub. */
+/** Dev only: `?fixture=1` serves sample data from web/src/dev/fixture.ts instead of the hub; `?fixture=demo` plays the promo story in web/src/dev/demo.ts. */
 export const fixtureMode = import.meta.env.DEV && new URLSearchParams(location.search).has('fixture');
+
+export function loadFixture() {
+  return new URLSearchParams(location.search).get('fixture') === 'demo' ? import('../dev/demo.ts') : import('../dev/fixture.ts');
+}
 
 async function send(path: string, init: RequestInit): Promise<Response> {
   if (import.meta.env.DEV && fixtureMode) {
-    const { fixtureFetch } = await import('../dev/fixture.ts');
+    const { fixtureFetch } = await loadFixture();
     return fixtureFetch(path, init);
   }
   return fetch(path, init);
