@@ -28,14 +28,14 @@
 
 对你的编程 agent 说：
 
-> 从 https://github.com/stefano2007517-star/dango 安装 Dango
+> 从 https://github.com/TaoMachina/dango 安装 Dango
 
 它会按 [INSTALL.md](INSTALL.md) 安装，在桌面放一个 **Dango** 图标，装好后告诉你。
 
 手动安装，需要 Node.js 24 或更高版本：
 
 ```sh
-git clone https://github.com/stefano2007517-star/dango.git
+git clone https://github.com/TaoMachina/dango.git
 cd dango
 npm install
 npm run setup

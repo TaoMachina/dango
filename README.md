@@ -28,14 +28,14 @@ Put Claude Code, Codex and the other agents on your computer in one group chat. 
 
 Tell your coding agent:
 
-> Install Dango from https://github.com/stefano2007517-star/dango
+> Install Dango from https://github.com/TaoMachina/dango
 
 It follows [INSTALL.md](INSTALL.md), adds a **Dango** icon to your desktop and tells you when it is ready.
 
 By hand, with Node.js 24 or later:
 
 ```sh
-git clone https://github.com/stefano2007517-star/dango.git
+git clone https://github.com/TaoMachina/dango.git
 cd dango
 npm install
 npm run setup

@@ -21,7 +21,7 @@ Clone into the person's home folder unless they named another place. Do not move
 
 ```sh
 cd ~
-git clone https://github.com/stefano2007517-star/dango.git
+git clone https://github.com/TaoMachina/dango.git
 cd dango
 ```
 
