@@ -124,7 +124,7 @@ const migrations: string[] = [
   );
   -- Context window use of the stored session.
   ALTER TABLE acp_sessions ADD COLUMN usage TEXT;
-  -- A code thread started with agentry_start_code_task reports each finished run to the conversation that asked for it.
+  -- A code thread started with dango_start_code_task reports each finished run to the conversation that asked for it.
   ALTER TABLE conversations ADD COLUMN requested_from TEXT REFERENCES conversations(id) ON DELETE SET NULL;
   `,
   `

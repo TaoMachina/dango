@@ -39,7 +39,7 @@ function SettingsMenu() {
           void shutdown();
         }}
       >
-        Quit Agentry
+        Quit Dango
       </MenuItem>
     </div>
   );

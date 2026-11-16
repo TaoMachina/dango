@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. Agentry is an early preview, so issues that describe a real problem with your agents are as useful as code.
+Thanks for helping. Dango is an early preview, so issues that describe a real problem with your agents are as useful as code.
 
 ## Before you start
 
@@ -26,8 +26,8 @@ npm test
 npm run build
 ```
 
-If your change touches how Agentry talks to agents, try it with a real agent and say in the pull request which agent and model you used and what you saw.
+If your change touches how Dango talks to agents, try it with a real agent and say in the pull request which agent and model you used and what you saw.
 
-Write code comments, docs and commit messages in short, plain English.
+Write code comments, docs and commit messages in short, plain English. `README.zh-CN.md` is a Chinese translation of `README.md`; change both together.
 
 By contributing you agree that your contribution is licensed under the [Apache License 2.0](LICENSE).

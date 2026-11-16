@@ -1,4 +1,4 @@
-// The hub side of the Agentry tools that agents call through server/mcp/bridge.ts.
+// The hub side of the Dango tools that agents call through server/mcp/bridge.ts.
 import { randomBytes } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 import { z } from 'zod';
@@ -34,7 +34,7 @@ export const readThreadSchema = z.object({ conversation: z.string().min(1) });
 export const delegateSchema = z.object({ helper: z.string().min(1), task: z.string().min(1), title: z.string().optional() });
 export const waitSchema = z.object({ delegationId: z.string().min(1) });
 
-// Agents end an MCP tool call that runs too long, so agentry_delegate and agentry_wait_for_helper wait at most this long.
+// Agents end an MCP tool call that runs too long, so dango_delegate and dango_wait_for_helper wait at most this long.
 // Codex: mcp_servers.<id>.tool_timeout_sec defaults to 60 s (Codex configuration reference,
 // https://learn.chatgpt.com/docs/config-file/config-reference), and codex-acp 2.6.0 passes the servers it is given without
 // a tool_timeout_sec (toCodexMcpServerConfig in its dist/index.js). Claude Code (claude.exe of @anthropic-ai/claude-agent-sdk 0.3.323)
@@ -44,7 +44,7 @@ export const DELEGATE_WAIT_MS = 50_000;
 
 type SubagentPart = Extract<Part, { type: 'subagent' }>;
 
-// A helper's run that a main agent started with agentry_delegate, shown live as a subagent part of the main agent's reply.
+// A helper's run that a main agent started with dango_delegate, shown live as a subagent part of the main agent's reply.
 interface Delegation {
   parent: LiveRun;
   partIndex: number;
@@ -131,7 +131,7 @@ export class Tools {
     const wanted = input.conversation.trim();
     // Conversations come newest first, so a repeated title finds the latest thread.
     const thread = this.codeThreads().find(c => c.id === wanted || c.title.toLowerCase() === wanted.toLowerCase());
-    if (!thread) throw new HttpError(404, `No Code thread "${wanted}". agentry_list_projects lists them.`);
+    if (!thread) throw new HttpError(404, `No Code thread "${wanted}". dango_list_projects lists them.`);
     const project = thread.projectId ? this.store.getProject(thread.projectId) : null;
     const agent = this.store.getAgent(thread.memberIds[0]);
     return {
@@ -184,7 +184,7 @@ export class Tools {
       throw new HttpError(403, `"${input.helper}" is not an enabled helper in this thread. Enabled helpers: ${enabled.join(', ') || 'none'}.`);
     }
     const parent = [...this.runs.lives.values()].find(l => l.conversation.id === conversation.id && l.agent.id === caller.agentId && !l.finished);
-    if (!parent) throw new HttpError(409, 'agentry_delegate works during your own turn in this thread.');
+    if (!parent) throw new HttpError(409, 'dango_delegate works during your own turn in this thread.');
     const requester = this.store.getAgent(caller.agentId)!;
     // The first line names the thread; 60 characters fit a sidebar row, as for threads the person starts.
     const title = input.title?.trim() || firstLine(input.task).slice(0, 60);
@@ -240,7 +240,7 @@ export class Tools {
     if (ended) return this.result(ended);
     return {
       status: 'running', delegationId: runId, thread: delegation.part.title,
-      note: 'The helper is still working. Call agentry_wait_for_helper with this delegationId to keep waiting.',
+      note: 'The helper is still working. Call dango_wait_for_helper with this delegationId to keep waiting.',
     };
   }
 

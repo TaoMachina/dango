@@ -26,7 +26,7 @@ interface Session {
   live: LiveRun | null;
   // session/load replays history as updates; those are already in the conversation.
   loading: boolean;
-  // An agent without a session system prompt gets the Agentry context before its first prompt.
+  // An agent without a session system prompt gets the Dango context before its first prompt.
   needsContext: boolean;
   // The group facts the agent last heard; a change is announced with the next prompt.
   membership: string;
@@ -95,7 +95,7 @@ export class AcpHost implements Executor {
     const running = this.processes.get(agent.id);
     if (running) return running;
     const entry = this.o.catalog.find(e => e.id === agent.catalogId);
-    if (!entry) throw new Error(`${agent.runtimeLabel} is not in Agentry's agent catalog.`);
+    if (!entry) throw new Error(`${agent.runtimeLabel} is not in Dango's agent catalog.`);
     this.setStatus(agent.id, 'starting', null);
     const subagentModel = this.o.store.getAgent(agent.id)?.subagentModel?.value;
     const env = subagentModel && entry.subagentModelEnv ? entry.subagentModelEnv(subagentModel) : {};
@@ -146,10 +146,10 @@ export class AcpHost implements Executor {
   private mcpServers(agentId: ID, conversationId: ID): acp.McpServer[] {
     const token = this.o.tools.issue(agentId, conversationId);
     return [{
-      name: 'agentry',
+      name: 'dango',
       command: process.execPath,
       args: [this.o.bridgePath],
-      env: [{ name: 'AGENTRY_URL', value: this.o.hubUrl() }, { name: 'AGENTRY_TOOL_TOKEN', value: token }],
+      env: [{ name: 'DANGO_URL', value: this.o.hubUrl() }, { name: 'DANGO_TOOL_TOKEN', value: token }],
     }];
   }
 
@@ -168,7 +168,7 @@ export class AcpHost implements Executor {
     return sessionContext(conversation, agent, this.o.runs.members(conversation), project, describeHelpers(this.o.store, conversation));
   }
 
-  // What goes before the conversation text: the Agentry context once per new session, or a group change since the last prompt.
+  // What goes before the conversation text: the Dango context once per new session, or a group change since the last prompt.
   private preface(session: Session, live: LiveRun): string[] {
     const key = membershipKey(live.conversation);
     const changed = key !== session.membership;

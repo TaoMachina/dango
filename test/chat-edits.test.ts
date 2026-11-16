@@ -13,7 +13,7 @@ const tool = (kind: string, paths: string[], diff = false, status: ToolStatus = 
 });
 
 test('edited files come from diffs and write tools, never from reads or the scratch folder', () => {
-  const root = mkdtempSync(join(tmpdir(), 'agentry-edits-'));
+  const root = mkdtempSync(join(tmpdir(), 'dango-edits-'));
   const scratch = join(root, 'chat');
   const parts: Part[] = [
     tool('read', [join(root, 'app', 'readme.md')]),
@@ -28,7 +28,7 @@ test('edited files come from diffs and write tools, never from reads or the scra
 });
 
 test('the project folder is the git repository, else the common folder, never a drive or the home folder', () => {
-  const root = mkdtempSync(join(tmpdir(), 'agentry-project-'));
+  const root = mkdtempSync(join(tmpdir(), 'dango-project-'));
   const repo = join(root, 'repo');
   mkdirSync(join(repo, '.git'), { recursive: true });
   mkdirSync(join(repo, 'src', 'ui'), { recursive: true });

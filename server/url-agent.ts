@@ -153,7 +153,7 @@ export class UrlAgents implements Executor {
     this.requests.set(live.run.id, controller);
     live.begin();
     const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'text/event-stream', ...authHeaders(config.apiKey) };
-    // One remote session per Agentry conversation, so the agent keeps its own transcript and memory per conversation.
+    // One remote session per Dango conversation, so the agent keeps its own transcript and memory per conversation.
     if (config.sessionHeader) headers[config.sessionHeader] = live.conversation.id;
     try {
       const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {

@@ -53,7 +53,7 @@ export function rawRequest(port: number, method: string, path: string, headers: 
 }
 
 export async function startTestHub(catalog: CatalogEntry[], options: { delegateWaitMs?: number } = {}): Promise<TestHub> {
-  const home = mkdtempSync(join(tmpdir(), 'agentry-test-'));
+  const home = mkdtempSync(join(tmpdir(), 'dango-test-'));
   const hub = await createHub({ home, port: 0, catalog, userHome: home, webDist: null, ...options });
   const raw = (method: string, path: string, headers?: Record<string, string>, body?: unknown) => rawRequest(hub.port, method, path, headers, body);
 

@@ -31,7 +31,7 @@ export class AgentProcess {
       this.stderrTail = (this.stderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_BYTES);
     });
 
-    const app = acp.client({ name: 'agentry' })
+    const app = acp.client({ name: 'dango' })
       .onNotification('session/update', ({ params }) => handlers.onUpdate(params))
       .onRequest('session/request_permission', ({ params, signal }) => handlers.onPermission(params, signal));
     this.connection = app.connect(acp.ndJsonStream(
@@ -57,10 +57,10 @@ export class AgentProcess {
   async initialize(): Promise<acp.InitializeResponse> {
     this.init = await this.connection.agent.request('initialize', {
       protocolVersion: acp.PROTOCOL_VERSION,
-      // Agents use their own file and terminal tools, so Agentry offers neither.
+      // Agents use their own file and terminal tools, so Dango offers neither.
       // subagents: the agent reports each subagent it starts and streams the subagent's own session updates.
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, subagents: {} },
-      clientInfo: { name: 'agentry', version: '0.2.0' },
+      clientInfo: { name: 'dango', version: '0.2.0' },
     });
     return this.init;
   }

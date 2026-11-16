@@ -13,7 +13,7 @@ import { useStore } from '../lib/store.ts';
 
 type Overrides = Record<ID, Record<string, string | boolean>>;
 
-const LAST_AGENT = 'agentry.code.agent';
+const LAST_AGENT = 'dango.code.agent';
 
 function readLastAgent(): string | null {
   // Storage can be unavailable (private windows); the first agent is then the default.
@@ -136,7 +136,7 @@ function ProjectPicker({ project, onChange }: { project: ID | null; onChange: (i
               <span className="flex items-center gap-2">
                 <span className="min-w-0 flex-1">
                   <span className="block">New folder</span>
-                  <span className="block text-[12px] text-muted">In ~/Agentry/projects, named after the task</span>
+                  <span className="block text-[12px] text-muted">In ~/Dango/projects, named after the task</span>
                 </span>
                 {project === null && <Check size={14} />}
               </span>

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
 import type { Store } from './store.ts';
 
-export const SESSION_COOKIE = 'agentry_session';
+export const SESSION_COOKIE = 'dango_session';
 
 export function randomToken(): string {
   return randomBytes(32).toString('hex');

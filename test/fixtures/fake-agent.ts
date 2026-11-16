@@ -1,5 +1,5 @@
 // A small ACP agent for tests. Usage: node fake-agent.ts <name> [mentionTarget] [sessionDelayMs] [restore]
-// The last line of the prompt selects behavior, so Agentry's context text before it triggers nothing:
+// The last line of the prompt selects behavior, so Dango's context text before it triggers nothing:
 //   "tool"       -> reports a tool call with a diff
 //   "permission" -> asks for permission and replies with the chosen option id
 //   "chain"      -> replies "@<mentionTarget> chain" so the target continues

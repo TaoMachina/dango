@@ -28,11 +28,11 @@ export interface HubOptions {
   home?: string;
   port: number;
   catalog?: CatalogEntry[];
-  // The folder that holds Agentry/chat and Agentry/projects; tests pass a temporary one.
+  // The folder that holds Dango/chat and Dango/projects; tests pass a temporary one.
   userHome?: string;
   // null: serve only the API (development, where Vite serves the web app).
   webDist?: string | null;
-  // How long agentry_delegate waits for a helper before answering 'running'; tests pass a short one. Default: DELEGATE_WAIT_MS.
+  // How long dango_delegate waits for a helper before answering 'running'; tests pass a short one. Default: DELEGATE_WAIT_MS.
   delegateWaitMs?: number;
   onShutdown?: () => void;
 }
@@ -50,7 +50,7 @@ export async function createHub(options: HubOptions) {
   const hubUrl = () => `http://127.0.0.1:${port}`;
   const events = new Events();
   const home = options.userHome ?? homedir();
-  // Edits in the chat folder or Agentry's own data are scratch work, not a project.
+  // Edits in the chat folder or Dango's own data are scratch work, not a project.
   const runs = new Runs(store, events, home, [defaultWorkDir(home), paths.dir]);
   const tokens = new ToolTokens();
   const routines = new Routines(store, events, runs);
@@ -103,7 +103,7 @@ export async function createHub(options: HubOptions) {
     .on('POST', '/agent-api/messages', c => external.post(c.caller, parse(postSchema, c.body)));
 
   async function handle(req: IncomingMessage, res: ServerResponse) {
-    if (!hostAllowed(req.headers.host, port)) return sendJson(res, 403, { error: 'Agentry only answers requests addressed to 127.0.0.1 or localhost.' });
+    if (!hostAllowed(req.headers.host, port)) return sendJson(res, 403, { error: 'Dango only answers requests addressed to 127.0.0.1 or localhost.' });
     const url = new URL(req.url ?? '/', hubUrl());
     const path = url.pathname;
     const method = req.method ?? 'GET';
@@ -115,13 +115,13 @@ export async function createHub(options: HubOptions) {
     }
     if (path === '/auth' && method === 'GET') {
       const session = auth.redeemCode(url.searchParams.get('code') ?? '');
-      if (!session) return sendJson(res, 401, { error: 'This sign-in link was already used or has expired. Open Agentry from its icon again.' });
+      if (!session) return sendJson(res, 401, { error: 'This sign-in link was already used or has expired. Open Dango from its icon again.' });
       // One year keeps the browser signed in across restarts; the session row stays revocable in the database.
       res.writeHead(302, { 'set-cookie': `${SESSION_COOKIE}=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, location: '/' });
       return res.end();
     }
     if (path.startsWith('/api/')) {
-      if (!auth.signedIn(req)) return sendJson(res, 401, { error: 'Not signed in. Open Agentry from its icon.' });
+      if (!auth.signedIn(req)) return sendJson(res, 401, { error: 'Not signed in. Open Dango from its icon.' });
       if (method !== 'GET' && method !== 'HEAD' && !originAllowed(req.headers.origin, port)) return sendJson(res, 403, { error: 'Cross-origin request refused.' });
       return dispatch(api, req, res, url, undefined);
     }

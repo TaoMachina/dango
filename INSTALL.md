@@ -1,8 +1,8 @@
-# Install Agentry
+# Install Dango
 
-**This file is written for an AI agent** (Codex, Claude Code, Antigravity or similar) that a person asked to install Agentry. Follow it from top to bottom on the person's computer. Run each command and check its result before the next step. Do not ask the person to type anything unless a step says so.
+**This file is written for an AI agent** (Codex, Claude Code, Antigravity or similar) that a person asked to install Dango. Follow it from top to bottom on the person's computer. Run each command and check its result before the next step. Do not ask the person to type anything unless a step says so.
 
-Agentry is a local web app. It finds the agents installed on this computer and lets the person chat with them in one page, alone or in groups. It needs no account and no API key.
+Dango is a local web app. It finds the agents installed on this computer and lets the person chat with them in one page, alone or in groups. It needs no account and no API key.
 
 ## 1. Check the tools
 
@@ -20,8 +20,8 @@ Clone into the person's home folder unless they named another place. Do not move
 
 ```sh
 cd ~
-git clone https://github.com/stefano2007517-star/agentry.git
-cd agentry
+git clone https://github.com/stefano2007517-star/dango.git
+cd dango
 ```
 
 If the folder already exists, run `git pull` inside it instead.
@@ -33,22 +33,22 @@ npm install
 npm run setup
 ```
 
-`npm run setup` builds the web app, adds an **Agentry** icon to the desktop and the app menu (Start menu on Windows, `~/Applications` on macOS, the applications menu on Linux), starts Agentry in the background and opens it in the default browser.
+`npm run setup` builds the web app, adds a **Dango** icon to the desktop and the app menu (Start menu on Windows, `~/Applications` on macOS, the applications menu on Linux), starts Dango in the background and opens it in the default browser.
 
 ## 4. Check it worked
 
-Open http://127.0.0.1:7420/api/health. It must answer `{"ok":true}`. If it does not, read `~/.agentry/hub.log` and fix the reported problem, then run `npm run setup` again.
+Open http://127.0.0.1:7420/api/health. It must answer `{"ok":true}`. If it does not, read `~/.dango/hub.log` and fix the reported problem, then run `npm run setup` again.
 
 ## 5. Tell the person
 
 Say this, in the person's language:
 
-> Agentry is installed. Double-click the **Agentry** icon on your desktop. Your agents are already listed in Chat — click one to start talking. You can rename them and change their faces.
+> Dango is installed. Double-click the **Dango** icon on your desktop. Your agents are already listed in Chat — click one to start talking. You can rename them and change their faces.
 
 If an agent shows **Needs sign-in**, tell the person to sign in once with that agent's own command, for example `claude`, `codex` or `agy acp --login`.
 
 ## Later
 
 - Update: in the same folder run `git pull`, `npm install` and `npm run setup`.
-- Data lives in `~/.agentry`. Removing the code folder keeps it.
-- Port 7420 is the default. Set `AGENTRY_PORT` before `npm run setup` if another program uses it.
+- Data lives in `~/.dango`. Removing the code folder keeps it.
+- Port 7420 is the default. Set `DANGO_PORT` before `npm run setup` if another program uses it.

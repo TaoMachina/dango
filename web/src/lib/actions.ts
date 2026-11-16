@@ -61,7 +61,7 @@ export function restoreFromUrl() {
 export function toggleList(wide: boolean) {
   const ui = getState().ui;
   if (!wide) return updateUI({ drawer: ui.drawer === 'list' ? null : 'list' });
-  localStorage.setItem('agentry.listCollapsed', ui.listCollapsed ? '0' : '1');
+  localStorage.setItem('dango.listCollapsed', ui.listCollapsed ? '0' : '1');
   updateUI({ listCollapsed: !ui.listCollapsed });
 }
 
@@ -70,7 +70,7 @@ export function togglePanel(wide: boolean) {
   if (!wide) return updateUI({ drawer: ui.drawer === 'panel' ? null : 'panel', side: null });
   // A helper's thread fills the panel, so the panel counts as open while it shows.
   const open = !(ui.panelOpen || ui.side);
-  localStorage.setItem('agentry.panelOpen', open ? '1' : '0');
+  localStorage.setItem('dango.panelOpen', open ? '1' : '0');
   updateUI({ panelOpen: open, side: null });
 }
 
@@ -308,7 +308,7 @@ export async function pickFolder() {
   return (await api<{ path: string | null }>('POST', '/api/fs/pick-folder')).path;
 }
 
-/** `path` adds an existing folder; `name` creates ~/Agentry/projects/<name>. */
+/** `path` adds an existing folder; `name` creates ~/Dango/projects/<name>. */
 export async function createProject(body: { path: string } | { name: string }) {
   const project = await api<Project>('POST', '/api/projects', body);
   upsert('projects', project);

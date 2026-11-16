@@ -64,7 +64,7 @@ export interface Project {
 
 export type ConversationKind = 'chat' | 'group' | 'code';
 
-// Another coding agent the main agent of a Code thread may hand work to through Agentry (agentry_delegate).
+// Another coding agent the main agent of a Code thread may hand work to through Dango (dango_delegate).
 // options: the helper's own session options (model, effort, ...) applied to the child thread before its first prompt;
 // empty keeps the helper's defaults. Values are validated against the helper's draft options.
 export interface Helper {
@@ -138,7 +138,7 @@ export type Part =
       state: 'running' | 'idle' | 'requires_action' | 'unknown';
       activity: string | null; // the child's latest step, e.g. its current tool title or a line of its text
       model: string | null; // the child's model when it reports one
-      // Set when the subagent is another agent that Agentry runs for this one (cross-agent delegation);
+      // Set when the subagent is another agent that Dango runs for this one (cross-agent delegation);
       // both null for the agent's own native subagents.
       agentId: ID | null;
       conversationId: ID | null; // the child thread, openable from the parent
@@ -281,7 +281,7 @@ export interface StateResponse {
 // DELETE /api/agents/:id                              -> {} (external and url agents only)
 // POST   /api/projects                                { path } | { name } -> Project
 //                                                     path: an existing folder (from /api/fs/pick-folder)
-//                                                     name: creates ~/Agentry/projects/<name>
+//                                                     name: creates ~/Dango/projects/<name>
 // DELETE /api/projects/:id                            -> {}
 // POST   /api/fs/pick-folder                          -> { path: string | null } (opens the operating system's folder dialog on this computer; null when cancelled)
 // POST   /api/routines                                { conversationId, agentId, title, prompt, schedule } -> Routine
@@ -295,7 +295,7 @@ export interface StateResponse {
 
 export type CreateConversationRequest =
   | { kind: 'group'; title: string; memberIds: ID[]; leadId?: ID }
-  // projectId null: the hub makes a new folder for the thread under ~/Agentry/projects, named from the title.
+  // projectId null: the hub makes a new folder for the thread under ~/Dango/projects, named from the title.
   // options: the model, effort and mode picked before the thread exists, applied before its first prompt.
   | { kind: 'code'; projectId: ID | null; agentId: ID; title: string; options?: { optionId: string; value: string | boolean }[] };
 

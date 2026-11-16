@@ -8,7 +8,7 @@ import { useStore } from '../lib/store.ts';
 import { relativeTime } from '../lib/time.ts';
 import { NewProjectForm } from './NewProjectForm.tsx';
 
-const COLLAPSED_KEY = 'agentry.code.collapsed';
+const COLLAPSED_KEY = 'dango.code.collapsed';
 
 function readCollapsed(): ID[] {
   return JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]') as ID[];

@@ -67,7 +67,7 @@ test('the context lists the enabled helpers, and an open session hears a change'
   await send(c.id, 'echo first');
   const first = textOf(await finishedReply(t, c.id, one.id));
   assert.match(first, /Helpers: Two \(Two; model: large; effort: its default\)\. They are other coding agents/);
-  assert.match(first, /agentry_delegate/);
+  assert.match(first, /dango_delegate/);
   assert.doesNotMatch(first, /Three \(/);
   await patchHelpers(c.id, [{ agentId: three.id, enabled: true, options: [{ optionId: 'effort', value: 'high' }] }]);
   await send(c.id, 'echo second');

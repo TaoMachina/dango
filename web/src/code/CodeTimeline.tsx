@@ -198,7 +198,7 @@ export function SubagentRow({ agent, context, streaming }: { agent: Subagent; co
   );
 }
 
-/** The subagent's face: the Agentry agent's avatar when another agent acts as it, else a bot mark; a dot shows its state. */
+/** The subagent's face: the Dango agent's avatar when another agent acts as it, else a bot mark; a dot shows its state. */
 export function LiveSubagentFace({ part, agent, size }: { part: LiveSubagent; agent: Agent | undefined; size: number }) {
   return (
     <span className="relative flex shrink-0 items-center justify-center" style={{ width: size, height: size }} aria-hidden>
@@ -208,7 +208,7 @@ export function LiveSubagentFace({ part, agent, size }: { part: LiveSubagent; ag
   );
 }
 
-/** "Open" for a subagent that has its own thread in Agentry: it opens in the right panel. */
+/** "Open" for a subagent that has its own thread in Dango: it opens in the right panel. */
 export function OpenThreadButton({ conversationId }: { conversationId: ID }) {
   const wide = useMedia(WIDE_PANEL);
   return (

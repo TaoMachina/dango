@@ -54,7 +54,7 @@ export function NewProjectForm({ onDone }: { onDone: (project: Project) => void 
             Create
           </button>
         </div>
-        <p className="mt-1.5 truncate text-[12px] text-muted">Creates ~/Agentry/projects/{trimmed || 'name'}</p>
+        <p className="mt-1.5 truncate text-[12px] text-muted">Creates ~/Dango/projects/{trimmed || 'name'}</p>
       </form>
     </div>
   );

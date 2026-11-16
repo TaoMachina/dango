@@ -54,7 +54,7 @@ interface IFileDialog {
   void GetResult(out IShellItem ppsi);
 }
 
-public static class AgentryFolderPicker {
+public static class DangoFolderPicker {
   const uint FOS_PICKFOLDERS = 0x20;
   const uint FOS_FORCEFILESYSTEM = 0x40;
   const uint SIGDN_FILESYSPATH = 0x80058000;
@@ -80,7 +80,7 @@ public static class AgentryFolderPicker {
 $owner = New-Object System.Windows.Forms.Form
 $owner.TopMost = $true
 $owner.ShowInTaskbar = $false
-[Console]::Out.Write([AgentryFolderPicker]::Pick($owner.Handle, '${PROMPT}'))
+[Console]::Out.Write([DangoFolderPicker]::Pick($owner.Handle, '${PROMPT}'))
 $owner.Dispose()
 `;
 

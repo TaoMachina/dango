@@ -1,4 +1,4 @@
-// Builds the web app and adds an Agentry icon to the desktop and app menu, then opens Agentry.
+// Builds the web app and adds a Dango icon to the desktop and app menu, then opens Dango.
 // Usage (after `npm install`): npm run setup
 import { execFileSync, spawnSync } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, copyFileSync, chmodSync, symlinkSync, existsSync, rmSync } from 'node:fs';
@@ -14,7 +14,7 @@ const launcher = join(root, 'scripts', 'launch.ts');
 const paths = hubPaths();
 
 const [major] = process.versions.node.split('.').map(Number);
-if (major < 24) throw new Error(`Agentry needs Node.js 24 or later. This is ${process.version}.`);
+if (major < 24) throw new Error(`Dango needs Node.js 24 or later. This is ${process.version}.`);
 
 console.log('Building the web app…');
 await build({ configFile: join(root, 'vite.config.ts'), logLevel: 'warn' });
@@ -26,7 +26,7 @@ if (existsSync(paths.hubJson)) {
   // A killed hub leaves hub.json behind and its PID may be reused, so only stop a PID whose hub still answers.
   const answering = await fetch(`http://127.0.0.1:${port}/api/health`).then(r => r.ok, () => false);
   if (answering && isAlive(pid)) {
-    console.log('Stopping the running Agentry…');
+    console.log('Stopping the running Dango…');
     // The hub stops its agents on SIGTERM; Windows has no signals, so end the process tree there.
     if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
     else process.kill(pid, 'SIGTERM');
@@ -48,7 +48,7 @@ function isAlive(pid: number): boolean {
 
 if (process.platform === 'win32') {
   // wscript runs the launcher without a console window.
-  const vbs = join(paths.dir, 'Agentry.vbs');
+  const vbs = join(paths.dir, 'Dango.vbs');
   writeFileSync(vbs, [
     'Set shell = CreateObject("WScript.Shell")',
     `shell.CurrentDirectory = "${root}"`,
@@ -59,43 +59,43 @@ if (process.platform === 'win32') {
     $shell = New-Object -ComObject WScript.Shell
     $targets = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))
     foreach ($dir in $targets) {
-      $link = $shell.CreateShortcut((Join-Path $dir 'Agentry.lnk'))
+      $link = $shell.CreateShortcut((Join-Path $dir 'Dango.lnk'))
       $link.TargetPath = Join-Path $env:WINDIR 'System32\\wscript.exe'
       $link.Arguments = '"${vbs}"'
       $link.WorkingDirectory = '${root}'
-      $link.IconLocation = '${join(root, 'assets', 'agentry.ico')},0'
+      $link.IconLocation = '${join(root, 'assets', 'dango.ico')},0'
       $link.Description = 'Chat with the agents on this computer'
       $link.Save()
     }`;
   execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], { stdio: 'inherit' });
-  console.log('Added Agentry to the desktop and the Start menu.');
+  console.log('Added Dango to the desktop and the Start menu.');
 } else if (process.platform === 'darwin') {
-  const app = join(homedir(), 'Applications', 'Agentry.app');
+  const app = join(homedir(), 'Applications', 'Dango.app');
   rmSync(app, { recursive: true, force: true });
   mkdirSync(join(app, 'Contents', 'MacOS'), { recursive: true });
   mkdirSync(join(app, 'Contents', 'Resources'), { recursive: true });
   writeFileSync(join(app, 'Contents', 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleName</key><string>Agentry</string>
-<key>CFBundleIdentifier</key><string>dev.agentry.launcher</string>
-<key>CFBundleExecutable</key><string>Agentry</string>
-<key>CFBundleIconFile</key><string>agentry.icns</string>
+<key>CFBundleName</key><string>Dango</string>
+<key>CFBundleIdentifier</key><string>dev.dango.launcher</string>
+<key>CFBundleExecutable</key><string>Dango</string>
+<key>CFBundleIconFile</key><string>dango.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSUIElement</key><true/>
 </dict></plist>
 `);
-  const exe = join(app, 'Contents', 'MacOS', 'Agentry');
+  const exe = join(app, 'Contents', 'MacOS', 'Dango');
   writeFileSync(exe, `#!/bin/sh\ncd "${root}"\nexec "${node}" "${launcher}"\n`);
   chmodSync(exe, 0o755);
-  copyFileSync(join(root, 'assets', 'agentry.icns'), join(app, 'Contents', 'Resources', 'agentry.icns'));
-  const desktopLink = join(homedir(), 'Desktop', 'Agentry.app');
+  copyFileSync(join(root, 'assets', 'dango.icns'), join(app, 'Contents', 'Resources', 'dango.icns'));
+  const desktopLink = join(homedir(), 'Desktop', 'Dango.app');
   if (!existsSync(desktopLink)) symlinkSync(app, desktopLink);
-  console.log('Added Agentry to ~/Applications and the desktop.');
+  console.log('Added Dango to ~/Applications and the desktop.');
 } else {
   const entry = `[Desktop Entry]
 Type=Application
-Name=Agentry
+Name=Dango
 Comment=Chat with the agents on this computer
 Exec="${node}" "${launcher}"
 Path=${root}
@@ -105,17 +105,17 @@ Categories=Development;Chat;
 `;
   const apps = join(homedir(), '.local', 'share', 'applications');
   mkdirSync(apps, { recursive: true });
-  writeFileSync(join(apps, 'agentry.desktop'), entry);
+  writeFileSync(join(apps, 'dango.desktop'), entry);
   const desktopDir = join(homedir(), 'Desktop');
   if (existsSync(desktopDir)) {
-    const file = join(desktopDir, 'agentry.desktop');
+    const file = join(desktopDir, 'dango.desktop');
     writeFileSync(file, entry);
     chmodSync(file, 0o755);
     // GNOME requires a trusted flag before it runs a desktop launcher; other desktops ignore gio.
     spawnSync('gio', ['set', file, 'metadata::trusted', 'true'], { stdio: 'ignore' });
   }
-  console.log('Added Agentry to the app menu and the desktop.');
+  console.log('Added Dango to the app menu and the desktop.');
 }
 
-console.log('Opening Agentry…');
+console.log('Opening Dango…');
 await import('./launch.ts');

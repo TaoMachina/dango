@@ -14,7 +14,7 @@ let t: TestHub;
 
 const chunk = (delta: object) => `data: ${JSON.stringify({ object: 'chat.completion.chunk', choices: [{ index: 0, delta }] })}\n\n`;
 
-// Group members tell themselves apart by the Agentry context in the system message.
+// Group members tell themselves apart by the Dango context in the system message.
 function answer(body: Recorded['body']): string {
   const system = body.messages[0].content;
   const last = body.messages.at(-1)!.content;
@@ -105,8 +105,8 @@ test('a chat message streams the reply from the API into the agent message', asy
   assert.equal(sent.body.model, 'fake-agent');
   assert.equal(sent.body.stream, true);
   assert.equal(sent.body.messages[0].role, 'system');
-  assert.match(sent.body.messages[0].content, /^You are Remote in Agentry/);
-  assert.doesNotMatch(sent.body.messages[0].content, /agentry_/);
+  assert.match(sent.body.messages[0].content, /^You are Remote in Dango/);
+  assert.doesNotMatch(sent.body.messages[0].content, /dango_/);
   assert.deepEqual(sent.body.messages.slice(1), [{ role: 'user', content: 'hi' }]);
   assert.equal(sent.headers['x-hermes-session-id'], undefined);
 });

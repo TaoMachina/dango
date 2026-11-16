@@ -24,7 +24,7 @@ export function serveStatic(root: string, pathname: string, res: ServerResponse)
   const file = inside && existsSync(requested) && statSync(requested).isFile() ? requested : join(base, 'index.html');
   if (!existsSync(file)) {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
-    res.end('The web app is not built. Run `npm run build` in the Agentry folder.');
+    res.end('The web app is not built. Run `npm run build` in the Dango folder.');
     return;
   }
   // Vite writes content-hashed files to /assets/, so they never change; one year is the conventional maximum.

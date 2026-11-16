@@ -256,7 +256,7 @@ function HelperRow({ conversationId, helper }: { conversationId: string; helper:
   );
 }
 
-/** Other coding agents the main agent may hand work to through Agentry, each with its own model and effort. */
+/** Other coding agents the main agent may hand work to through Dango, each with its own model and effort. */
 function Helpers({ conversation, agent }: { conversation: Conversation; agent: Agent }) {
   const key = conversation.helpers.map((h) => h.agentId).join(',');
   useEffect(() => {

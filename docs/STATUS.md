@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-16. Read this, `AGENTS.md` and `docs/ARCHITECTURE.md` before changing code.
 
-Agentry is an early preview (0.x). It is used daily on Windows. macOS and Linux launchers exist but have not been verified yet.
+Dango is an early preview (0.x). It is used daily on Windows. macOS and Linux launchers exist but have not been verified yet.
 
 ## What works, and how it was verified
 
@@ -14,7 +14,7 @@ Checks: `npm run check` (types), `npm test` (focused tests with fake ACP agents,
 | Detection | Installed ACP agents appear in Chat with their own chat and face | Claude Code, Codex. Antigravity, OpenClaw, Hermes, Goose, OpenCode and Pi have catalog entries but were not tried |
 | Chat | Streaming replies, native tool calls, model and effort picker, context ring, permissions as cards, Stop | Real agents |
 | Groups | Lead gets unmentioned messages, `@Name` routing, agent-to-agent handoffs with a limit, lead reviews members' answers, per-member model and effort | Claude Code lead with Codex |
-| Agentry context | Every session is told its tools, role, members and helpers | Real agents |
+| Dango context | Every session is told its tools, role, members and helpers | Real agents |
 | Code | Task box with a model-first picker across agents, effort, mode, project or auto-created folder; work-log timeline; overview panel (where, context, plan, subagents, outputs, chapters); fork the latest turn; pin chapters | Codex |
 | Chat → Code | Chat agents start Code threads for coding work; direct edits from chat add the project to Code | Claude Code |
 | Subagents | Live ACP `subagent_update` parts; subagent model per agent | Claude Code, Codex |
@@ -22,7 +22,7 @@ Checks: `npm run check` (types), `npm test` (focused tests with fake ACP agents,
 | Add agent | Copy an instruction; the agent joins under its own name and greets | Claude Code CLI |
 | Cloud agents | Connect by URL to an OpenAI-compatible API | Fake server only |
 | Routines | Daily, weekly, interval and one-time schedules | Tests only |
-| macOS / Linux | Setup creates `~/Applications/Agentry.app` / a `.desktop` launcher | Not verified |
+| macOS / Linux | Setup creates `~/Applications/Dango.app` / a `.desktop` launcher | Not verified |
 
 ## Known limits
 
@@ -43,4 +43,4 @@ Checks: `npm run check` (types), `npm test` (focused tests with fake ACP agents,
 ## Notes for contributors
 
 - Write repository text in plain English.
-- Test hubs must use a scratch `AGENTRY_HOME` and another port; never point tests at `~/.agentry`.
+- Test hubs must use a scratch `DANGO_HOME` and another port; never point tests at `~/.dango`.

@@ -21,7 +21,7 @@ export interface CatalogEntry {
 
 const require = createRequire(import.meta.url);
 
-// The Claude Code and Codex adapters are pinned dependencies of Agentry; run their entry scripts with this Node.
+// The Claude Code and Codex adapters are pinned dependencies of Dango; run their entry scripts with this Node.
 function adapter(pkg: string): Launch {
   return { command: process.execPath, args: [join(dirname(require.resolve(`${pkg}/package.json`)), 'dist', 'index.js')] };
 }
@@ -108,7 +108,7 @@ export function isInstalled(entry: CatalogEntry): boolean {
 
 // Turns a launch into something spawn can start without a shell where possible.
 // Windows cannot spawn .cmd files directly, and a shell in between hides the real process from kill.
-// npm's .cmd shims name the script or executable they run, so Agentry runs that target itself.
+// npm's .cmd shims name the script or executable they run, so Dango runs that target itself.
 export function resolveLaunch(launch: Launch): Launch & { shell: boolean } {
   const resolved = findOnPath(launch.command) ?? launch.command;
   if (process.platform !== 'win32' || /\.(exe|com)$/i.test(resolved)) return { ...launch, command: resolved, shell: false };

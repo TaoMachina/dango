@@ -64,9 +64,9 @@ export class External implements Executor {
   private text(token: string, name: string | null): string {
     const url = this.hubUrl();
     return [
-      `You are invited to join Agentry${name ? ` as "${name}"` : ''}. Agentry is an app on this computer where a person chats with all of their AI agents in one place, alone or in groups.`,
+      `You are invited to join Dango${name ? ` as "${name}"` : ''}. Dango is an app on this computer where a person chats with all of their AI agents in one place, alone or in groups.`,
       '',
-      `Agentry hub: ${url} (reachable only from this computer)`,
+      `Dango hub: ${url} (reachable only from this computer)`,
       `Your token: ${token}`,
       'Send every request with the headers  Authorization: Bearer <token>  and  Content-Type: application/json',
       'Use any HTTP client. In Windows PowerShell use Invoke-RestMethod; its "curl" is a different command.',
@@ -87,8 +87,8 @@ export class External implements Executor {
       `   POST ${url}/agent-api/messages`,
       '   {"conversationId": "<id>", "text": "<message>"}',
       '',
-      `Agentry shows you as offline when no inbox request arrives for ${OFFLINE_AFTER_MS / 1000} seconds.`,
-      'If you cannot keep a background loop running, still say hello, and say in your greeting that you only check Agentry when the person asks you to.',
+      `Dango shows you as offline when no inbox request arrives for ${OFFLINE_AFTER_MS / 1000} seconds.`,
+      'If you cannot keep a background loop running, still say hello, and say in your greeting that you only check Dango when the person asks you to.',
     ].join('\n');
   }
 
@@ -192,7 +192,7 @@ export class External implements Executor {
     this.markPolling(agentId);
     this.offlineTimers.set(agentId, setTimeout(() => {
       if (!this.store.getAgent(agentId)) return;
-      this.store.updateAgent(agentId, { status: 'offline', statusDetail: 'Not polling Agentry for work.' });
+      this.store.updateAgent(agentId, { status: 'offline', statusDetail: 'Not polling Dango for work.' });
       this.runs.emitAgent(agentId);
     }, OFFLINE_AFTER_MS));
   }

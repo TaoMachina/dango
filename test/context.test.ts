@@ -18,11 +18,11 @@ const group = (leadId: string): Conversation => ({
   lastMessage: null, activeRuns: 0, createdAt: '', updatedAt: '',
 });
 
-test('the context tells a chat agent its Agentry tools and a code agent its project', async () => {
+test('the context tells a chat agent its Dango tools and a code agent its project', async () => {
   const chat = (await t.api<StateResponse>('GET', '/api/state')).conversations.find(c => c.id === one.chatId)!;
   const text = sessionContext(chat, one, [one], null);
-  assert.match(text, /^You are One in Agentry/);
-  for (const tool of ['agentry_start_code_task', 'agentry_list_projects', 'agentry_read_code_thread', 'agentry_create_routine']) assert.ok(text.includes(tool), tool);
+  assert.match(text, /^You are One in Dango/);
+  for (const tool of ['dango_start_code_task', 'dango_list_projects', 'dango_read_code_thread', 'dango_create_routine']) assert.ok(text.includes(tool), tool);
   const project: Project = { id: 'p', name: 'demo', path: '/work/demo', environmentId: 'local', createdAt: '' };
   assert.match(sessionContext({ ...chat, kind: 'code', projectId: 'p' }, one, [one], project), /working in project demo at \/work\/demo\./);
 });
@@ -34,17 +34,17 @@ test('the context tells the lead it takes unmentioned messages and a member how 
   assert.match(lead, /stop after 3 in a row/);
   const member = sessionContext(group(one.id), two, [one, two], null);
   assert.match(member, /The lead is @One\. When you are asked, do your part[\s\S]*the lead is told when you finish/);
-  assert.ok(member.includes('agentry_start_code_task'), 'group members know their tools');
+  assert.ok(member.includes('dango_start_code_task'), 'group members know their tools');
   assert.doesNotMatch(member, /You are the lead/);
 });
 
 test('an agent without a session system prompt gets the context once, then a note when the group changes', async () => {
   const g = await t.api<Conversation>('POST', '/api/conversations', { kind: 'group', title: 'Room', memberIds: [one.id, two.id] });
   await t.api('POST', `/api/conversations/${g.id}/messages`, { text: 'echo first' });
-  assert.match(textOf(await finishedReply(t, g.id, one.id)), /You are One in Agentry[\s\S]*You are the lead/);
+  assert.match(textOf(await finishedReply(t, g.id, one.id)), /You are One in Dango[\s\S]*You are the lead/);
   await t.api('POST', `/api/conversations/${g.id}/messages`, { text: 'echo second' });
   const second = textOf(await finishedReply(t, g.id, one.id, 1));
-  assert.doesNotMatch(second, /You are One in Agentry|Group update/);
+  assert.doesNotMatch(second, /You are One in Dango|Group update/);
   await t.api('PATCH', `/api/conversations/${g.id}`, { leadId: two.id });
   await t.api('POST', `/api/conversations/${g.id}/messages`, { text: 'echo @One third' });
   assert.match(textOf(await finishedReply(t, g.id, one.id, 2)), /Group update: members are now @One \(One\), @Two \(Two\)\. The lead is @Two\./);

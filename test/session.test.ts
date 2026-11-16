@@ -25,8 +25,8 @@ const readyUpsert = (conversationId: string) => waitFor(() => {
 const ids = (info: SessionInfo) => info.options.map(o => o.id);
 const value = (info: SessionInfo, id: string) => info.options.find(o => o.id === id)?.currentValue;
 
-test('projects by name are created under ~/Agentry/projects; picked folders must exist', async () => {
-  const dir = join(t.hub.paths.dir, 'Agentry', 'projects', 'demo');
+test('projects by name are created under ~/Dango/projects; picked folders must exist', async () => {
+  const dir = join(t.hub.paths.dir, 'Dango', 'projects', 'demo');
   project = await t.api<Project>('POST', '/api/projects', { name: 'demo' });
   assert.equal(project.path, dir);
   assert.equal(project.name, 'demo');
@@ -78,7 +78,7 @@ test('a new task picks its model up front and, without a project, gets its own f
   const body = { kind: 'code', projectId: null, agentId: one.id, title: 'Fix the login page!', options: [{ optionId: 'model', value: 'large' }] };
   const thread = await t.api<Conversation>('POST', '/api/conversations', body);
   const state = await t.api<StateResponse>('GET', '/api/state');
-  assert.equal(state.projects.find(p => p.id === thread.projectId)!.path, join(t.hub.paths.dir, 'Agentry', 'projects', 'fix-the-login-page'));
+  assert.equal(state.projects.find(p => p.id === thread.projectId)!.path, join(t.hub.paths.dir, 'Dango', 'projects', 'fix-the-login-page'));
   // The same title again gets the next free folder name.
   const again = await t.api<Conversation>('POST', '/api/conversations', { ...body, options: [] });
   assert.ok((await t.api<StateResponse>('GET', '/api/state')).projects.find(p => p.id === again.projectId)!.path.endsWith('fix-the-login-page-2'));

@@ -225,7 +225,7 @@ export class LiveRun {
   }
 }
 
-// Follows one run: its parts as they stream, and its end. Agentry's delegation shows a helper's run in its parent's reply this way.
+// Follows one run: its parts as they stream, and its end. Dango's delegation shows a helper's run in its parent's reply this way.
 export interface RunWatcher {
   onParts(live: LiveRun): void;
   onEnd(run: StoredRun): void;

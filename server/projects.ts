@@ -38,7 +38,7 @@ export function addFolder(store: Store, events: Events, path: string): Project {
   return register(store, events, full, basename(full) || full);
 }
 
-// POST /api/projects {name}: a new folder under ~/Agentry/projects.
+// POST /api/projects {name}: a new folder under ~/Dango/projects.
 export function createNamed(store: Store, events: Events, dir: string, name: string): Project {
   const trimmed = name.trim();
   // "." would name the projects folder itself.
@@ -61,7 +61,7 @@ export function newTaskFolder(store: Store, events: Events, dir: string, title: 
   return createNamed(store, events, dir, name);
 }
 
-// agentry_start_code_task: an absolute path becomes a project, creating the folder when missing.
+// dango_start_code_task: an absolute path becomes a project, creating the folder when missing.
 export function folderProject(store: Store, events: Events, path: string): Project {
   const full = absolute(path);
   const existing = projectAt(store, full);

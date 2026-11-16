@@ -88,14 +88,14 @@ function conversation(id: ID, extra: Partial<Conversation>): Conversation {
 const conversations: Conversation[] = [
   ...agents.map((a) => conversation(a.chatId, { title: a.name, memberIds: [a.id] })),
   conversation('g-launch', { kind: 'group', title: 'Launch crew', memberIds: ['claude', 'codex'], leadId: 'claude' }),
-  conversation('t-composer', { kind: 'code', title: 'Grow the composer with its text', memberIds: ['claude'], projectId: 'p-agentry' }),
+  conversation('t-composer', { kind: 'code', title: 'Grow the composer with its text', memberIds: ['claude'], projectId: 'p-dango' }),
   conversation('t-links', { kind: 'code', title: 'Fix stale changelog links', memberIds: ['codex'], projectId: 'p-site' }),
   // The child thread of a subagent that Claude Code handed to Codex.
-  conversation('t-helper', { kind: 'code', title: 'Review textarea sizing', memberIds: ['codex'], projectId: 'p-agentry' }),
+  conversation('t-helper', { kind: 'code', title: 'Review textarea sizing', memberIds: ['codex'], projectId: 'p-dango' }),
 ];
 
 const projects: Project[] = [
-  { id: 'p-agentry', name: 'agentry', path: 'D:\\projects\\agentry', environmentId: 'local', createdAt: ago(60 * 24 * 3) },
+  { id: 'p-dango', name: 'dango', path: 'D:\\projects\\dango', environmentId: 'local', createdAt: ago(60 * 24 * 3) },
   { id: 'p-site', name: 'site', path: 'D:\\projects\\site', environmentId: 'local', createdAt: ago(60 * 24 * 2) },
 ];
 
@@ -614,7 +614,7 @@ export async function fixtureFetch(url: string, init: RequestInit): Promise<Resp
   if (method === 'POST' && path === '/api/agents/rescan') return json({ agents: structuredClone(agents) });
   if (method === 'POST' && path === '/api/agents/external') {
     return json({
-      instruction: `You are invited to join Agentry.\n\nAgentry hub: http://127.0.0.1:7420\nYour token: sample_token\n\n1. Say hello once with your own name:\ncurl -s -X POST http://127.0.0.1:7420/agent-api/hello -H "Authorization: Bearer sample_token" -d '{"name":"<your name>"}'`,
+      instruction: `You are invited to join Dango.\n\nDango hub: http://127.0.0.1:7420\nYour token: sample_token\n\n1. Say hello once with your own name:\ncurl -s -X POST http://127.0.0.1:7420/agent-api/hello -H "Authorization: Bearer sample_token" -d '{"name":"<your name>"}'`,
     });
   }
   if ((m = path.match(/^\/api\/agents\/([^/]+)$/))) {
@@ -626,7 +626,7 @@ export async function fixtureFetch(url: string, init: RequestInit): Promise<Resp
   }
   if (method === 'POST' && path === '/api/fs/pick-folder') return json({ path: 'D:\\projects\\notes' });
   if (method === 'POST' && path === '/api/projects') {
-    const p = (body.path as string | undefined) ?? `C:\\Users\\dev\\Agentry\\projects\\${body.name as string}`;
+    const p = (body.path as string | undefined) ?? `C:\\Users\\dev\\Dango\\projects\\${body.name as string}`;
     const project: Project = { id: id('p'), name: p.split(/[\\/]/).filter(Boolean).pop()!, path: p, environmentId: 'local', createdAt: new Date().toISOString() };
     projects.push(project);
     return json(project);

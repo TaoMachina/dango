@@ -300,7 +300,7 @@ export const LIVE_STATE: Record<LiveSubagent['state'], { label: string; dot: str
   unknown: { label: 'Unknown', dot: 'bg-faint' },
 };
 
-/** A subagent's name: its own title, else the Agentry agent acting as it. */
+/** A subagent's name: its own title, else the Dango agent acting as it. */
 export function liveTitle(part: LiveSubagent, agentName: string | undefined) {
   return part.title ?? agentName ?? 'Subagent';
 }

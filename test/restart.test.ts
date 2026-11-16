@@ -20,7 +20,7 @@ test('a session that fails to load gives way to a new session whose reply reache
 });
 
 test('a restart closes the open steps of a reply it interrupted', async () => {
-  const home = mkdtempSync(join(tmpdir(), 'agentry-test-'));
+  const home = mkdtempSync(join(tmpdir(), 'dango-test-'));
   const options = { home, port: 0, catalog: [fakeEntry('one', 'One')], userHome: home, webDist: null };
   const first = await createHub(options);
   const one = first.store.listAgents()[0];
