@@ -29,7 +29,7 @@ import { DeleteButton } from './DeleteButton.tsx';
 
 // The Code thread's right panel: one scrolling overview, top to bottom — where the thread works,
 // its context window, plan, subagents, outputs and chapters, then the thread itself.
-// Sections without data are left out. Diffs and the changed-files list follow T3 Code's diff panel.
+// Sections without data are left out.
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (

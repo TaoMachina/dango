@@ -30,7 +30,7 @@ export interface ApiDeps {
   shutdown: () => void;
 }
 
-// ARCHITECTURE.md: agent-to-agent mentions stop after 3 hops by default, following Codync's group rounds.
+// ARCHITECTURE.md: agent-to-agent mentions stop after 3 hops by default: hand off, answer, sum up.
 const DEFAULT_HOP_LIMIT = 3;
 // shared/types.ts: a message page holds the newest 100 messages.
 const MESSAGE_PAGE = 100;

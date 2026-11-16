@@ -1,0 +1,28 @@
+name: Bug
+description: Something does not work as described
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Operating system
+      placeholder: Windows 11, macOS 15, Ubuntu 24.04, ...
+    validations:
+      required: true
+  - type: input
+    id: agents
+    attributes:
+      label: Agents involved
+      description: Name and version, for example `claude --version` or `codex --version`.
+  - type: textarea
+    id: log
+    attributes:
+      label: Hub log
+      description: The relevant lines from `~/.agentry/hub.log`. Remove anything private.
+      render: text

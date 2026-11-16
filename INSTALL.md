@@ -20,7 +20,7 @@ Clone into the person's home folder unless they named another place. Do not move
 
 ```sh
 cd ~
-git clone https://github.com/<owner>/agentry.git
+git clone https://github.com/stefano2007517-star/agentry.git
 cd agentry
 ```
 

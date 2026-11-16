@@ -49,7 +49,7 @@ import {
   type ToolPart,
 } from './workLog.ts';
 
-// The Code thread timeline, after T3 Code's MessagesTimeline: the prompt is a compact block on the
+// The Code thread timeline: the prompt is a compact block on the
 // right, the answer reads as a document, and tool activity is a quiet work log.
 
 export interface TimelineContext {
@@ -404,7 +404,7 @@ function elapsed(since: string, now: number) {
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-/** "Working for 1m 5s" under a running turn, after T3 Code's WorkingTimelineRow. */
+/** "Working for 1m 5s" under a running turn. */
 function WorkingLine({ since, waiting }: { since: string; waiting: boolean }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {

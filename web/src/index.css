@@ -149,7 +149,7 @@ button:disabled {
   animation: typing 1.2s infinite;
 }
 
-/* Code work log: the line the agent is working on now, after T3 Code's live-tool shine.
+/* Code work log: the line the agent is working on now shines.
    Same period as the typing dots. */
 @keyframes shimmer {
   from { background-position: 100% 0; }

@@ -4,7 +4,7 @@ function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
-/** List-row time like Grok Bot: clock time today, "Yesterday", weekday within the week, then a date. */
+/** List-row time: clock time today, "Yesterday", weekday within the week, then a date. */
 export function relativeTime(iso: string) {
   const date = new Date(iso);
   const days = Math.round((startOfDay(new Date()) - startOfDay(date)) / DAY);
@@ -21,7 +21,7 @@ export function fullTime(iso: string) {
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 
-/** Message time after T3 Code: "just now", "5 min ago", "2 h ago" within a day, then a date. */
+/** Message time: "just now", "5 min ago", "2 h ago" within a day, then a date. */
 export function agoTime(iso: string, now: number) {
   const date = new Date(iso);
   const diff = now - date.getTime();

@@ -12,7 +12,7 @@ interface Props {
   onClick: () => void;
 }
 
-/** A Grok Bot style list row: avatar, name, time, one line of preview. */
+/** A list row: avatar, name, time, one line of preview. */
 export function ListRow({ avatar, title, time, subtitle, selected, dimmed, onClick }: Props) {
   return (
     <button

@@ -78,7 +78,7 @@ export function MessageList({ conversation }: { conversation: Conversation }) {
         )}
         {messages.length === 0 && <p className="mt-16 text-center text-[14px] text-muted">No messages yet</p>}
         {conversation.kind === 'code' ? (
-          // Code threads read as a work log (T3 Code), not as chat bubbles.
+          // Code threads read as a work log, not as chat bubbles.
           <CodeTimeline
             messages={messages}
             runs={thread.runs}

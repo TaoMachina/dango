@@ -6,7 +6,7 @@ Read `docs/ARCHITECTURE.md` before changing code. `shared/types.ts` is the contr
 
 - Agentry is local first. It runs on the person's computer, drives the agents installed there, and never runs a model itself.
 - Preserve each agent's native behavior: its own login, tools, models, modes, permission prompts and memory. Show what the agent reports; do not invent capabilities.
-- The interface follows Grok Bot's calm chat layout. Chat and Code share one visual system. Add a control only when the current task needs it.
+- The interface is a calm chat layout: a list, one conversation, an optional side panel. Chat and Code share one visual system. Add a control only when the current task needs it.
 - The first run must need no forms: open the icon, see the installed agents, start talking.
 
 ## Code

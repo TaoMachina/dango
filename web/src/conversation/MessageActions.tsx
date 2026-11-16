@@ -7,10 +7,10 @@ import { useMinuteClock } from '../lib/now.ts';
 import { toast } from '../lib/store.ts';
 import { agoTime, fullTime } from '../lib/time.ts';
 
-// The quiet row under a finished agent message, after T3 Code's AssistantMessageMeta: its time,
+// The quiet row under a finished agent message: its time,
 // then actions that show on hover or keyboard focus (always on touch screens, which cannot hover).
 
-// T3 Code shows its copy confirmation for 1000 ms (ANCHORED_COPY_TOAST_TIMEOUT_MS).
+// The copy confirmation shows for one second: long enough to notice, short enough not to linger.
 const COPIED_MS = 1000;
 
 /** The message's answer text as Markdown. */

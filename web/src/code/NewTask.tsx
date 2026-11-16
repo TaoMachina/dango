@@ -30,7 +30,7 @@ function withOverrides(options: SessionOption[], chosen: Record<string, string |
 }
 
 /**
- * Starts Code work the way T3 Code does: write the task, pick the model (which picks the agent), its effort,
+ * Starts Code work: write the task, pick the model (which picks the agent), its effort,
  * its access mode and the project, then send. Without a project the hub makes a new folder for the task.
  */
 export function NewTask({ projectId }: { projectId: ID | null }) {
@@ -180,7 +180,7 @@ function ProjectPicker({ project, onChange }: { project: ID | null; onChange: (i
   );
 }
 
-/** One picker for every agent's models, like T3 Code: agents down the left, the chosen agent's models and effort on the right. */
+/** One picker for every agent's models: agents down the left, the chosen agent's models and effort on the right. */
 function ModelPicker(props: { agent: Agent; coders: Agent[]; overrides: Overrides; choose: (agentId: ID) => SetOption }) {
   const { agent, coders, overrides, choose } = props;
   const agentOptions = useStore((s) => s.agentOptions);

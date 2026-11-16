@@ -1,7 +1,7 @@
 import type { Message, Part } from '../../../shared/types.ts';
 import { unifiedDiff } from '../lib/diff.ts';
 
-// Turns the parts of a Code thread into the rows T3 Code shows: answer text, work-log groups,
+// Turns the parts of a Code thread into timeline rows: answer text, work-log groups,
 // plan, permission and error rows. Also derives the right panel's plan, changes and subagents.
 
 export type ToolPart = Extract<Part, { type: 'tool' }>;

@@ -19,7 +19,7 @@ browser  ──HTTP + SSE──▶  hub (Node, 127.0.0.1)  ──ACP over stdio�
 ```
 
 - **Hub** (`server/`): one Node process. It serves the web app, stores conversations, routes messages, runs routines, and drives agents.
-- **Web app** (`web/`): React. Chat and Code share one visual system modeled on Grok Bot.
+- **Web app** (`web/`): React. Chat and Code share one visual system.
 - **Agent host** (`server/acp/`): detects installed agents and talks to them with the [Agent Client Protocol](https://agentclientprotocol.com). One process per agent. One ACP session per agent per conversation.
 - **Agentry tools** (`server/mcp/`): an MCP server passed to every ACP session. Agents use it to read group membership, list projects and their threads, start Code tasks, read a Code thread's progress and result, create routines, and delegate to helpers (`agentry_list_helpers`, `agentry_delegate`, `agentry_wait_for_helper`).
 - **Agentry context** (`server/acp/context.ts`): a short text that tells each agent who it is in Agentry and what it can do — its tools, and in a group the members, the lead and how to hand off with `@Name`. Agents that support it receive it appended to their native system prompt; others receive it before their first prompt. In a Code thread it lists the enabled helpers with their model and effort. Membership and helper changes reach existing sessions as a one-line update.
@@ -31,7 +31,7 @@ browser  ──HTTP + SSE──▶  hub (Node, 127.0.0.1)  ──ACP over stdio�
 
 - **Local first.** Subscriptions are used through each vendor's own CLI on the person's computer. Personal agents also run there. The hub therefore runs there too, and needs no account or server.
 - **ACP.** Claude Code, Codex, Antigravity CLI, OpenClaw, Hermes, Goose, OpenCode and Pi all accept ACP directly or through a published adapter. One protocol covers detection, sessions, streaming, tool activity, model and mode choice, permission requests and cancellation.
-- **One persistent chat per agent.** An agent in the sidebar is a teammate with one ongoing conversation, as in Grok Bot. Groups and Code threads are separate conversations with their own sessions.
+- **One persistent chat per agent.** An agent in the sidebar is a teammate with one ongoing conversation. Groups and Code threads are separate conversations with their own sessions.
 - **Bundled adapters.** Claude Code and Codex speak ACP through `@agentclientprotocol/claude-agent-acp` and `@agentclientprotocol/codex-acp`. Agentry installs pinned versions so the first chat does not wait for a download, and runs them with Node directly (no shell), which also lets Stop and Quit end their whole process tree on Windows. Both reuse the existing `~/.claude` and `~/.codex` logins.
 - **Native settings.** Model, mode, effort and similar choices are the agent's ACP session config options. Agentry shows whatever the agent reports and sets them with `session/set_config_option`.
 - **Native permissions.** Agentry does not advertise file-system or terminal client capabilities. Agents use their own tools. A permission request from an agent appears as a card in the conversation with the agent's own options.
@@ -51,7 +51,7 @@ An environment is the computer where an agent runs. Version 1 has one: this comp
 | Agent reply that mentions another member | That member, as part of the same request |
 | Routine fires | Its agent, in its conversation |
 
-Every agent turn is a **run** with an ID, a status and an optional parent run. A request and all runs it triggers form one tree. **Stop** cancels every active run in the conversation. Agent-to-agent mentions stop after the group's hop limit; the default of 3 follows Codync's group rounds and is a setting.
+Every agent turn is a **run** with an ID, a status and an optional parent run. A request and all runs it triggers form one tree. **Stop** cancels every active run in the conversation. Agent-to-agent mentions stop after the group's hop limit; the default of 3 lets a lead hand off, a member answer and the lead sum up without loops, and is a setting.
 
 An agent in a group receives the messages it has not yet seen, each prefixed with its author, so every member shares the room context while keeping its own session.
 
