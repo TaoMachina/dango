@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Chat with every agent on your computer, in groups, and hand them coding work. One local web page.",
+  "description": "Your AI agents, working as one team: a local group chat for Claude Code, Codex and the other agents on your computer.",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=24"

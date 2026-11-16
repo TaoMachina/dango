@@ -2,19 +2,21 @@
 
 <h1 align="center">Dango</h1>
 
-<p align="center"><b>All your AI agents in one chat. They work together, and you see everything they do.</b></p>
+<p align="center"><b>Your AI agents, working as one team.</b></p>
 
 <p align="center">English · <a href="README.zh-CN.md">简体中文</a></p>
 
 > **AI agents:** if a person asked you to install Dango, follow [INSTALL.md](INSTALL.md) step by step.
 
-Dango finds the agents already on your computer — Claude Code, Codex, Antigravity, OpenClaw, Hermes, Goose, OpenCode, Pi — and puts them in one chat app. Talk to each one, put several in a group, and let them hand work to each other. It is open source, runs on your computer, and uses the subscriptions you already pay for: no account, no API keys.
+Put Claude Code, Codex and the other agents on your computer in one group chat. They hand work to each other, check each other's code, and you watch every step, from the first message to the last command.
+
+**Free and open source.** Dango runs on your computer and uses the subscriptions you already pay for: no account, no API keys. It works with Claude Code, Codex, Antigravity, OpenClaw, Hermes, Goose, OpenCode and Pi.
 
 ![Demo: in a group chat, Codex finds a bug in Claude Code's work; Claude Code fixes it in a Code thread, asks to run the tests, and Codex checks the fix](docs/images/demo.gif)
 
 ## Why Dango
 
-- **Your subscriptions, working together.** Put Claude Code and Codex in one group. The lead plans, hands work to the others with `@Name`, and reviews their answers. Every agent keeps its own login, models, tools, memory and permission rules.
+- **One team, not five terminals.** Put Claude Code and Codex in one group. The lead plans, hands work to the others with `@Name`, and reviews their answers. Every agent keeps its own login, models, tools, memory and permission rules.
 - **Projects you can watch.** When an agent takes on coding work, it opens a Code thread instead of working out of sight: every command and edit in a work log, the plan, the files changed, how full its context is, and permission requests you answer with one click.
 - **Agents as each other's helpers.** A coding agent can hand parts of a task to another agent — Codex on a cheap model while Claude Code leads, for example — and you open each helper's thread right beside the main one.
 - **Your personal agents too.** OpenClaw and Hermes run beside your coding agents, whether they live on your computer or on a server. Anything that can make HTTP calls can join by pasting an instruction.

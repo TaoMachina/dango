@@ -2,19 +2,21 @@
 
 <h1 align="center">Dango 团子</h1>
 
-<p align="center"><b>把你所有的 AI agent 放进一个聊天里。它们互相协作，做的每一步你都看得见。</b></p>
+<p align="center"><b>让你的 AI agent 像一个团队一样干活。</b></p>
 
 <p align="center"><a href="README.md">English</a> · 简体中文</p>
 
 > **AI agent 请注意：** 如果有人让你安装 Dango，请按 [INSTALL.md](INSTALL.md) 一步步执行。
 
-Dango 会找到你电脑上已经装好的 agent —— Claude Code、Codex、Antigravity、OpenClaw、Hermes、Goose、OpenCode、Pi —— 把它们放进同一个聊天应用。你可以单独和每个 agent 聊，也可以把几个拉进一个群，让它们互相分派工作。Dango 开源、在你自己的电脑上运行，用的是你已经付费的订阅：不用注册账号，不用 API key。
+把 Claude Code、Codex 和你电脑上的其他 agent 拉进一个群聊。它们互相分派工作、互相检查代码，从第一条消息到最后一条命令，每一步你都看得见。
+
+**免费、开源。** Dango 在你自己的电脑上运行，用的是你已经付费的订阅：不用注册账号，不用 API key。支持 Claude Code、Codex、Antigravity、OpenClaw、Hermes、Goose、OpenCode 和 Pi。
 
 ![演示：群聊里 Codex 发现 Claude Code 的 bug；Claude Code 在 Code 线程里修复、请求运行测试，再由 Codex 复查](docs/images/demo.gif)
 
 ## 为什么用 Dango
 
-- **让你的订阅一起干活。** 把 Claude Code 和 Codex 拉进一个群。带队的 agent 做计划，用 `@名字` 把活分给其他成员，再检查它们的结果。每个 agent 都保留自己的登录、模型、工具、记忆和权限规则。
+- **一个团队，而不是五个终端。** 把 Claude Code 和 Codex 拉进一个群。带队的 agent 做计划，用 `@名字` 把活分给其他成员，再检查它们的结果。每个 agent 都保留自己的登录、模型、工具、记忆和权限规则。
 - **项目看得见。** agent 接到写代码的任务，会开一个 Code 线程，而不是闷头去做：每条命令、每处修改都记在工作日志里，还能看到计划、改了哪些文件、上下文用了多少，权限请求点一下就能批准。
 - **agent 互为助手。** 一个写代码的 agent 可以把一部分任务交给另一个 agent，比如 Claude Code 带队、Codex 用便宜的模型帮忙。每个助手的线程都能在主线程旁边直接打开。
 - **个人 agent 也能加入。** OpenClaw、Hermes 可以和写代码的 agent 一起工作，不管它们装在你电脑上还是跑在服务器上。任何能发 HTTP 请求的程序，粘贴一段说明就能加入。
