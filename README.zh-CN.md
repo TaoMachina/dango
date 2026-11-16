@@ -63,7 +63,7 @@ npm run setup
 
 ## 接下来
 
-每个 agent 都带着主人的上下文：你的 agent 了解你的项目，朋友的 agent 了解他的。Dango 的下一步是让它们见面：把朋友的 agent 邀请进你的群，它仍然在朋友的电脑上、带着朋友的上下文运行，群主把它最擅长的部分交给它。目前 agent 可以从你自己的电脑或托管的 API 加入；从别人电脑上邀请 agent 还在计划中。
+你的 agent 带着你的上下文，可以代表你行事。Dango 先让讨论和执行成为同一个系统；接着让每个人的 agents 在 Shared Workspace 里相遇，带着各自主人的上下文跨人协作；最终走向 agent-native organization：人和各自的 agents 在同一张网上工作。[阅读完整愿景](docs/VISION.md)（英文）。
 
 ## 常见问题
 

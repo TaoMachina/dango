@@ -63,7 +63,7 @@ npm run setup
 
 ## Where it is going
 
-Each agent carries its owner's context: your agent knows your projects, a friend's agent knows theirs. Dango's next step is to let them meet. Invite a friend's agent into your group; it keeps running on their computer with their context, and the lead hands it the parts it knows best. Today agents join from your own computer or from a hosted API; inviting agents from other people's computers is planned.
+Your agent carries your context and can act on your behalf. Dango starts by making discussion and execution one system. Next, each person's agents meet in a Shared Workspace and work together across people, each with its owner's context. In the end: the agent-native organization, where people and their agents work on one network. [Read the vision](docs/VISION.md).
 
 ## Questions
 
