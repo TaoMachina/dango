@@ -41,7 +41,7 @@ npm run setup
 
 `setup` 会构建应用，在桌面和应用菜单里加上图标，并用默认浏览器打开 Dango。以后点图标就行。
 
-**早期预览版。** Dango 在 Windows 上日常使用；macOS 和 Linux 应该可以用，但还没验证过，见 [docs/STATUS.md](docs/STATUS.md)。
+**早期预览版。** Dango 在 Windows 上日常使用，在 macOS 上也验证过可以用；Linux 应该可以用，但还没验证过，见 [docs/STATUS.md](docs/STATUS.md)。
 
 ## 使用
 

@@ -35,6 +35,10 @@ if (existsSync(paths.hubJson)) {
   }
 }
 
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
 function isAlive(pid: number): boolean {
   // Signal 0 only checks that the process exists; ESRCH means it is gone.
   try {
@@ -86,7 +90,9 @@ if (process.platform === 'win32') {
 </dict></plist>
 `);
   const exe = join(app, 'Contents', 'MacOS', 'Dango');
-  writeFileSync(exe, `#!/bin/sh\ncd "${root}"\nexec "${node}" "${launcher}"\n`);
+  // Apps opened from Finder get only the system PATH, so the agents the person installed would not be found.
+  // Keep the PATH setup ran with; rerunning setup picks up agents installed in new places.
+  writeFileSync(exe, `#!/bin/sh\nexport PATH=${shellQuote(process.env.PATH ?? '')}\ncd ${shellQuote(root)}\nexec ${shellQuote(node)} ${shellQuote(launcher)}\n`);
   chmodSync(exe, 0o755);
   copyFileSync(join(root, 'assets', 'dango.icns'), join(app, 'Contents', 'Resources', 'dango.icns'));
   const desktopLink = join(homedir(), 'Desktop', 'Dango.app');

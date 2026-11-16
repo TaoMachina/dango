@@ -41,7 +41,7 @@ npm run setup
 
 `setup` builds the app, adds the icon to your desktop and app menu, and opens Dango in your default browser. Next time, click the icon.
 
-**Early preview.** Dango is used daily on Windows. macOS and Linux should work but are not verified yet; see [docs/STATUS.md](docs/STATUS.md).
+**Early preview.** Dango is used daily on Windows and works on macOS. Linux should work but is not verified yet; see [docs/STATUS.md](docs/STATUS.md).
 
 ## Use
 

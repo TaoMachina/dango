@@ -13,6 +13,7 @@ git --version
 
 - Node.js must be **24 or later**. If it is missing or older, install the current LTS: `winget install OpenJS.NodeJS.LTS` (Windows), `brew install node` (macOS), or the distribution's package (Linux). Then open a new shell so `node` is on PATH.
 - If `git` is missing: `winget install Git.Git` (Windows), `xcode-select --install` (macOS), or the distribution's package (Linux).
+- On macOS, if `git` says the Xcode license is not agreed, ask the person to run `sudo xcodebuild -license accept` in Terminal. It needs their password, so they must type it themselves.
 
 ## 2. Get the code
 
@@ -50,5 +51,6 @@ If an agent shows **Needs sign-in**, tell the person to sign in once with that a
 ## Later
 
 - Update: in the same folder run `git pull`, `npm install` and `npm run setup`.
+- An agent installed later does not appear: run `npm run setup` again so the icon knows where it is.
 - Data lives in `~/.dango`. Removing the code folder keeps it.
 - Port 7420 is the default. Set `DANGO_PORT` before `npm run setup` if another program uses it.
