@@ -1,5 +1,5 @@
-// Draws the Dango mark (three soft dumplings with faces on one stick, like the 🍡 emoji:
-// several agents, one place) and writes assets/icon-256.png, assets/dango.ico and assets/dango.icns.
+// Draws the Dango mark (one soft pink dumpling with a face, in the same style as the agents'
+// faces in the app) and writes assets/icon-256.png, assets/dango.ico and assets/dango.icns.
 // web/public/favicon.svg draws the same shapes. Run once after changing the drawing: node scripts/make-icon.ts
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -11,35 +11,27 @@ const size = 256;
 const samples = 4; // 4x4 supersampling gives smooth edges at icon sizes
 
 type RGB = [number, number, number];
-// Geometry in a 100x100 box, the same numbers as favicon.svg. Listed front to back.
-const R = 17;
-const EDGE = 1.6; // a darker rim keeps the light dumpling visible on white backgrounds
-const balls: { x: number; y: number; fill: RGB; rim: RGB }[] = [
-  { x: 66, y: 32, fill: [244, 154, 184], rim: [222, 120, 156] }, // pink
-  { x: 50, y: 50, fill: [246, 236, 214], rim: [214, 196, 160] }, // cream
-  { x: 34, y: 68, fill: [140, 196, 120], rim: [104, 164, 86] }, // matcha
-];
+// Geometry in a 100x100 box, the same numbers as favicon.svg.
+const ball = { x: 50, y: 50, r: 44, fill: [244, 154, 184] as RGB, rim: [222, 120, 156] as RGB };
+const EDGE = 3; // a darker rim keeps the mark crisp on white and on dark backgrounds
+const eyes = [{ x: 40, y: 50 }, { x: 60, y: 50 }];
+const EYE = { rx: 3.8, ry: 5.8 };
 const eyeColor: RGB = [34, 30, 28];
-const stickColor: RGB = [196, 158, 108];
+// Soft cheeks and a highlight make it read as a dumpling, not a flat dot.
+const cheeks = [{ x: 30, y: 60 }, { x: 70, y: 60 }];
+const CHEEK = { rx: 6, ry: 3.6, color: [236, 122, 158] as RGB };
+const shine = { x: 33, y: 27, rx: 8, ry: 4.6, color: [250, 198, 216] as RGB };
 
-function inEye(x: number, y: number, bx: number, by: number) {
-  for (const ex of [bx - 5, bx + 5]) if (((x - ex) / 1.9) ** 2 + ((y - by) / 2.9) ** 2 <= 1) return true;
-  return false;
-}
-// The stick runs from (20, 84) to (80, 20) with round ends, 4.4 wide.
-function inStick(x: number, y: number) {
-  const ax = 20, ay = 84, bx = 80, by = 20;
-  const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
-  return Math.hypot(x - (ax + t * (bx - ax)), y - (ay + t * (by - ay))) <= 2.2;
-}
+const inEllipse = (x: number, y: number, cx: number, cy: number, rx: number, ry: number) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
+
 function colorAt(x: number, y: number): RGB | null {
-  for (const b of balls) {
-    const d = Math.hypot(x - b.x, y - b.y);
-    if (d > R) continue;
-    if (inEye(x, y, b.x, b.y)) return eyeColor;
-    return d > R - EDGE ? b.rim : b.fill;
-  }
-  return inStick(x, y) ? stickColor : null;
+  const d = Math.hypot(x - ball.x, y - ball.y);
+  if (d > ball.r) return null;
+  if (d > ball.r - EDGE) return ball.rim;
+  if (eyes.some((e) => inEllipse(x, y, e.x, e.y, EYE.rx, EYE.ry))) return eyeColor;
+  if (cheeks.some((c) => inEllipse(x, y, c.x, c.y, CHEEK.rx, CHEEK.ry))) return CHEEK.color;
+  if (inEllipse(x, y, shine.x, shine.y, shine.rx, shine.ry)) return shine.color;
+  return ball.fill;
 }
 
 const rgba = Buffer.alloc(size * size * 4);
